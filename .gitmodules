@@ -1,0 +1,3 @@
+[submodule "ziplora"]
+	path = ziplora
+	url = https://github.com/mkshing/ziplora-pytorch
