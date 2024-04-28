@@ -1,6 +1,3 @@
-[submodule "ziplora"]
-	path = ziplora
-	url = https://github.com/mkshing/ziplora-pytorch
 [submodule "data/dreambooth"]
 	path = data/dreambooth
 	url = https://github.com/google/dreambooth
