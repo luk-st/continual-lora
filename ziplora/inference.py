@@ -2,7 +2,7 @@ import argparse
 import gradio as gr
 import torch
 from diffusers import StableDiffusionXLPipeline
-from ziplora_pytorch.utils import insert_ziplora_to_unet
+from ziplora.ziplora_pytorch.utils import insert_ziplora_to_unet
 
 
 def parse_args():

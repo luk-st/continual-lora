@@ -5,7 +5,7 @@ import argparse
 import gradio as gr
 from diffusers import DiffusionPipeline
 import torch
-from ziplora_pytorch.utils import (
+from ziplora.ziplora_pytorch.utils import (
     get_lora_weights,
     merge_lora_weights,
     initialize_ziplora_layer,

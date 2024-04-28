@@ -3,8 +3,6 @@ This is an implementation of [ZipLoRA: Any Subject in Any Style by Effectively M
 
 The paper summary by the author is found [here](https://twitter.com/natanielruizg/status/1727718489425616912).
 
-![result](assets/result.png)
-
 ## Installation
 ```
 git clone git@github.com:mkshing/ziplora-pytorch.git

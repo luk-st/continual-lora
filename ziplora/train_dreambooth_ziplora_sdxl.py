@@ -59,8 +59,7 @@ from diffusers.optimization import get_scheduler
 from diffusers.training_utils import compute_snr, unet_lora_state_dict
 from diffusers.utils import check_min_version, is_wandb_available
 from diffusers.utils.import_utils import is_xformers_available
-from ziplora_pytorch import ZipLoRALinearLayer
-from ziplora_pytorch.utils import (
+from ziplora.ziplora_pytorch.utils import (
     get_lora_weights,
     merge_lora_weights,
     initialize_ziplora_layer,
