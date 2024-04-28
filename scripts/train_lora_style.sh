@@ -21,9 +21,9 @@ $ACCELERATE_PATH launch lora/train_dreambooth_lora_sdxl.py \
   --report_to="wandb" \
   --lr_scheduler="constant" \
   --lr_warmup_steps=0 \
-  --max_train_steps=1000 \
+  --max_train_steps=300 \
   --validation_prompt="${VALID_PROMPT}" \
-  --validation_epochs=50 \
+  --validation_epochs=100 \
   --seed="0" \
   --enable_xformers_memory_efficient_attention \
   --gradient_checkpointing \
