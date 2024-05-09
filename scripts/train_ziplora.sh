@@ -41,4 +41,5 @@ $ACCELERATE_PATH launch train_dreambooth_ziplora_sdxl.py \
   --gradient_checkpointing \
   --use_8bit_adam \
   --enable_xformers_memory_efficient_attention \
-  --quick_release
+  --quick_release \ 
+  --push_to_hub
