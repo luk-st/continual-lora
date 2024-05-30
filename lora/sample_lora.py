@@ -35,17 +35,19 @@ def main(args):
 
     prompt = args.prompt
 
+    output_type = "latent" if args.use_refiner else "pil"
     image = diffusion_pipe(
-        prompt=prompt, output_type="latent", generator=generator
+        prompt=prompt, output_type=output_type, generator=generator
     ).images[0]
+
     if args.use_refiner:
         image = refiner(
             prompt=prompt, image=image[None, :], generator=generator
         ).images[0]
 
     directory_path = os.path.dirname(args.save_path)
-    if not os.path.exists(directory_path):
-        os.makedirs(directory_path, exist_ok=True)
+
+    os.makedirs(directory_path, exist_ok=True)
 
     image.save(args.save_path)
 
