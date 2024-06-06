@@ -24,7 +24,7 @@ def clip_image_metric(pred_img_path: str, ref_img_paths: List[str]) -> float:
     ref_imgs = clip_processor(images=ref_imgs, return_tensors="pt").to(DEVICE)
     ref_features = clip_model.get_image_features(**ref_imgs)
 
-    sim = F.cosine_similarity(pred_features[0], ref_features, dim=-1)
+    sim = F.cosine_similarity(pred_features, ref_features, dim=-1)
     return sim.mean().item()
 
 
@@ -42,7 +42,7 @@ def clip_text_metric(pred_img_path: str, ref_texts: List[str]) -> float:
     ).to(DEVICE)
     ref_features = clip_model.get_text_features(**ref_texts)
 
-    sim = F.cosine_similarity(pred_features[0], ref_features, dim=-1)
+    sim = F.cosine_similarity(pred_features, ref_features, dim=-1)
     return sim.mean().item()
 
 
@@ -65,5 +65,5 @@ def dino_metric(pred_img_path: str, ref_img_paths: List[str]) -> float:
     ref_imgs = torch.stack([T(img) for img in ref_imgs]).to(DEVICE)
     ref_features = dino_model(ref_imgs).last_hidden_state
 
-    sim = F.cosine_similarity(pred_features[0, 0], ref_features[:, 0], dim=-1)
+    sim = F.cosine_similarity(pred_features[:, 0], ref_features[:, 0], dim=-1)
     return sim.mean().item()
