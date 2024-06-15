@@ -7,17 +7,17 @@ from huggingface_hub.repocard import RepoCard
 
 
 def main(args):
-    lora_model_id = args.pretrained_model_name_or_path
-    card = RepoCard.load(lora_model_id)
-    base_model_id = card.data.to_dict()["base_model"]
+    model_path = args.pretrained_model_name_or_path
+    # card = RepoCard.load(lora_model_id)
+    # base_model_id = card.data.to_dict()["base_model"]
 
     diffusion_pipe = DiffusionPipeline.from_pretrained(
-        base_model_id, torch_dtype=torch.float16
+        model_path, torch_dtype=torch.float16
     )
     if args.use_cuda:
         print("Using CUDA...")
         diffusion_pipe = diffusion_pipe.to("cuda")
-    diffusion_pipe.load_lora_weights(lora_model_id)
+    # diffusion_pipe.load_lora_weights(lora_model_id)
 
     if args.use_refiner:
         print("Using refiner...")

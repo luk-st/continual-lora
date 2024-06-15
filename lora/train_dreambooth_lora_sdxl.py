@@ -755,6 +755,12 @@ def parse_args(input_args=None):
             "Note: to use DoRA you need to install peft from main, `pip install git+https://github.com/huggingface/peft.git`"
         ),
     )
+    parser.add_argument(
+        "--save_whole_model",
+        action="store_true",
+        default=False,
+        help=("If True, we save merged model to output_dir"),
+    )
 
     if input_args is not None:
         args = parser.parse_args(input_args)
@@ -2276,6 +2282,14 @@ def main(args):
                 commit_message="End of training",
                 ignore_patterns=["step_*", "epoch_*"],
             )
+
+        if args.save_whole_model:
+            pipeline.fuse_lora(fuse_unet=True)
+            pipeline.unload_lora_weights()
+            # pipeline.save_pretrained(args.output_dir, safe_serialization=False, max_shard_size="15GB")
+            pipeline.save_pretrained(args.output_dir)
+            lora_path = Path(args.output_dir)
+            os.remove((lora_path / "pytorch_lora_weights.safetensors").resolve())
 
     accelerator.end_training()
 
