@@ -5,7 +5,7 @@ export VAE_PATH="madebyollin/sdxl-vae-fp16-fix"
 export ACCELERATE_PATH="/net/tscratch/people/plglukaszst/envs/lora/bin/accelerate"
 
 export RANK=64
-export SEED=42
+export SEED=0
 export WORKING_PATH="./models/seed_${SEED}_style"
 
 export MODEL_NAME="stabilityai/stable-diffusion-xl-base-1.0"
