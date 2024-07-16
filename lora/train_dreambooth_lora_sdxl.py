@@ -2286,7 +2286,6 @@ def main(args):
         if args.save_whole_model:
             pipeline.fuse_lora(fuse_unet=True)
             pipeline.unload_lora_weights()
-            # pipeline.save_pretrained(args.output_dir, safe_serialization=False, max_shard_size="15GB")
             pipeline.save_pretrained(args.output_dir)
             lora_path = Path(args.output_dir)
             os.remove((lora_path / "pytorch_lora_weights.safetensors").resolve())
