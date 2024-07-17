@@ -47,13 +47,9 @@ def sample_cl_models(
     device: str = DEVICE,
 ):
     def sample_on_task(
-        tasks_tokens, prompts_templates, model_path, samples_per_prompt, device
+        prompts, model_path, samples_per_prompt, device
     ):
         task_outs = {}
-        prompts = [
-            prompt.format(tasks_tokens[curr_task_number + 1])
-            for prompt in prompts_templates
-        ]
         out_prompts, out_samples = get_model_outs(
             pretrained_model_name_or_path=model_path,
             prompts=prompts,
@@ -73,9 +69,12 @@ def sample_cl_models(
         tasks_limit = task_number
 
     for curr_task_number in range(tasks_limit):
+        prompts = [
+            prompt.format(tasks_tokens[curr_task_number])
+            for prompt in prompts_templates
+        ]
         per_task_outs[curr_task_number + 1] = sample_on_task(
-            tasks_tokens=tasks_tokens,
-            prompts_templates=prompts_templates,
+            prompts=prompts,
             model_path=model_path,
             samples_per_prompt=samples_per_prompt,
             device=device,
@@ -140,3 +139,7 @@ def get_cl_lora_alignment_metrics(
 def save_pickle(obj, path):
     with open(path, "wb") as f:
         pickle.dump(obj, f)
+
+def load_pickle(path):
+    with open(path, "rb") as f:
+        return pickle.load(f)

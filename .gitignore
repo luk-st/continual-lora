@@ -164,3 +164,4 @@ outputs/
 models/
 wandb/
 ziplora/wandb/
+results/

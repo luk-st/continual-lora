@@ -2,7 +2,12 @@ import os
 
 import torch
 
-from eval.helpers import get_cl_lora_alignment_metrics, sample_cl_models, save_pickle
+from eval.helpers import (
+    get_cl_lora_alignment_metrics,
+    load_pickle,
+    sample_cl_models,
+    save_pickle,
+)
 from eval.metrics import calculate_cl_metrics
 from eval.plots import (
     convert_metrics_to_arrays,
@@ -75,26 +80,30 @@ def get_style_metrics():
     plot_incremental_performance_heatmap(
         clip_array=clip_array,
         dino_array=dino_array,
+        n_tasks=N_TASKS,
         name=f"heatmap",
         save_dir=RESULTS_DIR_PATH,
     )
     plot_incremental_performance_plot(
         clip_array=clip_array.T,
         dino_array=dino_array.T,
+        n_tasks=N_TASKS,
         name=f"plot",
         save_dir=RESULTS_DIR_PATH,
     )
 
     dino_avg_accuracy, dino_avg_forgetting = calculate_cl_metrics(dino_array.T[1:, :])
-    print(
-        f"DINO AVG_ACC={dino_avg_accuracy}",
-        f"DINO AVG_FORGETTING={dino_avg_forgetting}",
-    )
     clip_avg_accuracy, clip_avg_forgetting = calculate_cl_metrics(clip_array.T[1:, :])
-    print(
-        f"CLIP AVG_ACC={clip_avg_accuracy}",
-        f"CLIP AVG_FORGETTING={clip_avg_forgetting}",
-    )
+
+    with open(f"{RESULTS_DIR_PATH}/out_cl.txt", "w") as file:
+        dino_str = f"DINO AVG_ACC={dino_avg_accuracy}\nDINO AVG_FORGETTING={dino_avg_forgetting}\n"
+        clip_str = f"CLIP AVG_ACC={clip_avg_accuracy}\nCLIP AVG_FORGETTING={clip_avg_forgetting}\n"
+
+        file.write(dino_str)
+        print(dino_str)
+
+        file.write(clip_str)
+        print(clip_str)
 
 
 if __name__ == "__main__":

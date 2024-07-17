@@ -117,14 +117,14 @@ def clip_text_metric(pred_imgs: List[Image.Image], ref_texts: List[str]) -> floa
 
 
 def calculate_cl_metrics(metric_matrix):
-    T = accuracy_matrix.shape[0]
+    T = metric_matrix.shape[0]
 
     avg_accuracies = []
     for i in range(T):
         valid_accuracies = [
-            accuracy_matrix[i, j]
+            metric_matrix[i, j]
             for j in range(i + 1)
-            if not np.isnan(accuracy_matrix[i, j])
+            if not np.isnan(metric_matrix[i, j])
         ]
         if valid_accuracies:
             avg_accuracies.append(np.mean(valid_accuracies))
@@ -133,9 +133,7 @@ def calculate_cl_metrics(metric_matrix):
     forgetting_values = []
     for j in range(T):
         task_accuracies = [
-            accuracy_matrix[i, j]
-            for i in range(T)
-            if not np.isnan(accuracy_matrix[i, j])
+            metric_matrix[i, j] for i in range(T) if not np.isnan(metric_matrix[i, j])
         ]
         if len(task_accuracies) > 1:
             initial_accuracy = task_accuracies[0]
