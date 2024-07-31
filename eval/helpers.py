@@ -1,6 +1,7 @@
 import itertools
 import pickle
 
+import numpy as np
 import torch
 from diffusers import DiffusionPipeline
 
@@ -46,9 +47,7 @@ def sample_cl_models(
     samples_per_prompt=6,
     device: str = DEVICE,
 ):
-    def sample_on_task(
-        prompts, model_path, samples_per_prompt, device
-    ):
+    def sample_on_task(prompts, model_path, samples_per_prompt, device):
         task_outs = {}
         out_prompts, out_samples = get_model_outs(
             pretrained_model_name_or_path=model_path,
@@ -65,7 +64,7 @@ def sample_cl_models(
         model_path = BASE_SDXL_MODEL
         tasks_limit = n_tasks
     else:
-        model_path = models_paths[task_number]
+        model_path = models_paths[task_number - 1]
         tasks_limit = task_number
 
     for curr_task_number in range(tasks_limit):
@@ -103,6 +102,7 @@ def get_cl_lora_alignment_metrics(
     ):
         tasks_stats = {}
         for task in range(num_tasks):
+            print(f"{model_after_task_idx=}, {(task + 1)=}")
             samples = models_tasks_outputs[model_after_task_idx][task + 1]["samples"]
             gt_path = gt_datasets_paths[task]
             tasks_stats[task + 1] = {
@@ -140,6 +140,35 @@ def save_pickle(obj, path):
     with open(path, "wb") as f:
         pickle.dump(obj, f)
 
+
 def load_pickle(path):
     with open(path, "rb") as f:
         return pickle.load(f)
+
+
+def convert_metrics_to_arrays(metrics_names, tasks_metrics_dict, n_tasks):
+    values = {
+        metric_name: [
+            [
+                tasks_metrics_dict[i].get(j, {}).get(metric_name, np.nan)
+                for j in range(1, n_tasks + 1)
+            ]
+            for i in range(n_tasks + 1)
+        ]
+        for metric_name in metrics_names
+    }
+    arrays = {
+        metric_name: np.array(metric_values).T
+        for metric_name, metric_values in values.items()
+    }
+    return arrays
+
+
+def average_on_seeds(seeds_metrics, metrics_names):
+    return {
+        metric_name: np.mean(
+            np.stack([seed_metric[metric_name] for seed_metric in seeds_metrics]),
+            axis=0,
+        )
+        for metric_name in metrics_names
+    }

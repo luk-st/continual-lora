@@ -6,7 +6,7 @@ import seaborn as sns
 def plot_incremental_performance_heatmap(
     clip_array, dino_array, n_tasks, name="", save_dir="."
 ):
-    tasks = ["No task"] + [f"Task {idx}" for idx in range(1, n_tasks + 1)]
+    tasks = ["<No task>"] + [f"{idx}" for idx in range(1, n_tasks + 1)]
     colormap = "YlOrRd"
 
     # CLIP-I
@@ -22,8 +22,8 @@ def plot_incremental_performance_heatmap(
         linecolor="black",
     )
     plt.title("CLIP-I Alignment Score on next tasks")
-    plt.xlabel("Model after")
-    plt.ylabel("Task Number")
+    plt.xlabel("Model after task")
+    plt.ylabel("Performance on task")
     if name != "":
         plt.savefig(f"{save_dir}/{name}_CLIP.svg")
     plt.show()
@@ -41,8 +41,8 @@ def plot_incremental_performance_heatmap(
         linecolor="black",
     )
     plt.title("DINO Alignment Score on next tasks")
-    plt.xlabel("Model after")
-    plt.ylabel("Task Number")
+    plt.xlabel("Model after task")
+    plt.ylabel("Performance on task")
     if name != "":
         plt.savefig(f"{save_dir}/{name}_DINO.svg")
     plt.show()
@@ -70,7 +70,7 @@ def plot_incremental_performance_plot(
     )
     colors = plt.cm.viridis(np.linspace(0, 1, clip_array.shape[1] + 1))
     markers = ["o", "s", "^", "D", "P", "X", "H"]
-    tasks = ["No task"] + [f"Task {idx}" for idx in range(1, n_tasks + 1)]
+    tasks = ["<No task>"] + [f"{idx}" for idx in range(1, n_tasks + 1)]
 
     plt.figure(figsize=(10, 4))
     for task_finished in range(clip_array.shape[1] + 1):
@@ -97,7 +97,7 @@ def plot_incremental_performance_plot(
                 color=colors[task_finished],
                 linestyle="",
                 markersize=7,
-                label=f"After task {task_finished}",
+                label=f"Model after task {task_finished}",
             )
         else:
             y = clip_array[task_finished, :]
@@ -110,13 +110,13 @@ def plot_incremental_performance_plot(
                 linestyle="-",
                 linewidth=2,
                 markersize=7,
-                label=f"After task {task_finished}",
+                label=f"Model after task {task_finished}",
             )
     plt.title(
         "CLIP-I Alignment on each task\nduring each phase of task-incremental training",
         fontsize=13,
     )
-    plt.xlabel("Task Number", fontsize=14, color="gray")
+    plt.xlabel("Number of task", fontsize=14, color="gray")
     plt.ylabel("CLIP-I Score", fontsize=14, color="gray")
     plt.xticks(
         ticks=np.arange(1, len(tasks)), labels=tasks[1:], fontsize=12, color="gray"
@@ -160,7 +160,7 @@ def plot_incremental_performance_plot(
                 color=colors[task_finished],
                 linestyle="",
                 markersize=7,
-                label=f"After task {task_finished}",
+                label=f"Model after task {task_finished}",
             )
         else:
             y = dino_array[task_finished, :]
@@ -173,13 +173,13 @@ def plot_incremental_performance_plot(
                 linestyle="-",
                 linewidth=2,
                 markersize=7,
-                label=f"After task {task_finished}",
+                label=f"Model after task {task_finished}",
             )
     plt.title(
         "DINO Image Alignment on each task\nduring each phase of task-incremental training",
         fontsize=13,
     )
-    plt.xlabel("Task Number", fontsize=14, color="gray")
+    plt.xlabel("Number of task", fontsize=14, color="gray")
     plt.ylabel("DINO Score", fontsize=14, color="gray")
     plt.xticks(
         ticks=np.arange(1, len(tasks)), labels=tasks[1:], fontsize=12, color="gray"
@@ -197,18 +197,3 @@ def plot_incremental_performance_plot(
     if name != "":
         plt.savefig(f"{save_dir}/{name}_DINO.svg")
     plt.show()
-
-
-def convert_metrics_to_arrays(metrics_names, tasks_metrics_dict, n_tasks):
-    values = [
-        [
-            [
-                tasks_metrics_dict[i].get(j, {}).get(metric_name, np.nan)
-                for j in range(1, n_tasks + 1)
-            ]
-            for i in range(n_tasks + 1)
-        ]
-        for metric_name in metrics_names
-    ]
-    arrays = (np.array(metric_values).T for metric_values in values)
-    return arrays
