@@ -113,22 +113,26 @@ def get_object_metrics():
     # final_array=load_pickle(f"{FINAL_RESULTS_PATH}/final_metrics.pkl")
 
     plot_incremental_performance_heatmap(
-        clip_array=final_array['clip'],
-        dino_array=final_array['dino'],
+        arrays=[final_array["clip"], final_array["dino"]],
+        names=["CLIP", "DINO"],
         n_tasks=N_TASKS,
         name=f"heatmap",
         save_dir=FINAL_RESULTS_PATH,
     )
     plot_incremental_performance_plot(
-        clip_array=final_array['clip'].T,
-        dino_array=final_array['dino'].T,
+        arrays=[final_array["clip"].T, final_array["dino"].T],
+        names=["CLIP", "DINO"],
         n_tasks=N_TASKS,
         name=f"plot",
         save_dir=FINAL_RESULTS_PATH,
     )
 
-    dino_avg_accuracy, dino_avg_forgetting = calculate_cl_metrics(final_array['dino'].T[1:, :])
-    clip_avg_accuracy, clip_avg_forgetting = calculate_cl_metrics(final_array['clip'].T[1:, :])
+    dino_avg_accuracy, dino_avg_forgetting = calculate_cl_metrics(
+        final_array["dino"].T[1:, :]
+    )
+    clip_avg_accuracy, clip_avg_forgetting = calculate_cl_metrics(
+        final_array["clip"].T[1:, :]
+    )
     with open(f"{FINAL_RESULTS_PATH}/out_cl.txt", "w") as file:
         dino_str = f"DINO AVG_ACC={dino_avg_accuracy}\nDINO AVG_FORGETTING={dino_avg_forgetting}\n"
         clip_str = f"CLIP AVG_ACC={clip_avg_accuracy}\nCLIP AVG_FORGETTING={clip_avg_forgetting}\n"

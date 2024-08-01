@@ -107,15 +107,15 @@ def get_style_metrics():
     # final_array = load_pickle(f"{FINAL_RESULTS_PATH}/final_metrics.pkl")
 
     plot_incremental_performance_heatmap(
-        clip_array=final_array['csd'],
-        dino_array=final_array['dino'],
+        arrays=[final_array['csd'],final_array['dino']],
+        names=["CSD", "DINO"],
         n_tasks=N_TASKS,
         name=f"heatmap",
         save_dir=FINAL_RESULTS_PATH,
     )
     plot_incremental_performance_plot(
-        clip_array=final_array['csd'].T,
-        dino_array=final_array['dino'].T,
+        arrays=[final_array['csd'].T,final_array['dino'].T],
+        names=["CSD", "DINO"],
         n_tasks=N_TASKS,
         name=f"plot",
         save_dir=FINAL_RESULTS_PATH,
