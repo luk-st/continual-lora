@@ -11,6 +11,8 @@ from transformers import AutoModel, AutoProcessor, AutoTokenizer
 
 from eval.constants import CLIP_MODEL_NAME, DEVICE, DINO_MODEL_NAME
 
+from .csd.csd import csdimage_metric, get_csd_model
+
 
 def collect_jpg_files(directory: str) -> List[str]:
     jpg_files = glob.glob(os.path.join(directory, "**", "*.jpg"), recursive=True)
@@ -114,6 +116,14 @@ def clip_text_metric(pred_imgs: List[Image.Image], ref_texts: List[str]) -> floa
     overall_mean_sim = mean_sim.mean().item()
 
     return overall_mean_sim
+
+
+def csd_metric(pred_imgs: List[Image.Image], ref_path: str) -> float:
+    csd_model = get_csd_model()
+    ref_imgs = collect_jpg_files(ref_path)
+    ref_imgs = [Image.open(img) for img in ref_imgs]
+
+    return csdimage_metric(pred_imgs, ref_imgs, csd_model)
 
 
 def calculate_cl_metrics(metric_matrix):

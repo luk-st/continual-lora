@@ -81,9 +81,9 @@ def get_object_metrics():
                 samples_per_prompt=4,
                 device=device,
             )
-            for task_idx in range(N_TASKS, N_TASKS + 1)
+            for task_idx in range(N_TASKS + 1)
         ]
-        save_pickle(seed_outs, f"{results_dir_path}/samples_5.pkl")
+        save_pickle(seed_outs, f"{results_dir_path}/samples.pkl")
         # seed_outs = load_pickle(f"{results_dir_path}/samples.pkl")
         seeds_outs.append(seed_outs)
 
@@ -110,7 +110,7 @@ def get_object_metrics():
     ]
     final_array = average_on_seeds(seeds_metrics=seeds_arrays, metrics_names=METRICS)
     save_pickle(final_array, f"{FINAL_RESULTS_PATH}/final_metrics.pkl")
-    final_array=load_pickle(f"{FINAL_RESULTS_PATH}/final_metrics.pkl")
+    # final_array=load_pickle(f"{FINAL_RESULTS_PATH}/final_metrics.pkl")
 
     plot_incremental_performance_heatmap(
         clip_array=final_array['clip'],

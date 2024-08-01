@@ -6,7 +6,7 @@ import torch
 from diffusers import DiffusionPipeline
 
 from eval.constants import BASE_SDXL_MODEL, DEVICE
-from eval.metrics import clip_image_metric, dino_metric
+from eval.metrics import clip_image_metric, dino_metric, csd_metric
 
 
 def get_model_outs(
@@ -92,7 +92,7 @@ def get_cl_lora_alignment_metrics(
             samples = models_tasks_outputs[model_after_task_idx][task + 1]["samples"]
             gt_path = gt_datasets_paths[task]
             tasks_stats[task + 1] = {
-                "clip": clip_image_metric(samples, gt_path),
+                "csd": csd_metric(samples, gt_path),
                 "dino": dino_metric(samples, gt_path),
             }
         return tasks_stats
