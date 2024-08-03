@@ -2,15 +2,16 @@ import glob
 import os
 from typing import List
 
+import numpy as np
 import torch
 from PIL import Image
 from torch.nn import functional as F
 from torchvision import transforms
 from transformers import AutoModel, AutoProcessor, AutoTokenizer
 
-CLIP_MODEL_NAME = "openai/clip-vit-base-patch32"
-DINO_MODEL_NAME = "facebook/dino-vits16"
-DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+from eval.constants import CLIP_MODEL_NAME, DEVICE, DINO_MODEL_NAME
+
+from .csd.csd import csdimage_metric, get_csd_model
 
 
 def collect_jpg_files(directory: str) -> List[str]:
@@ -115,3 +116,39 @@ def clip_text_metric(pred_imgs: List[Image.Image], ref_texts: List[str]) -> floa
     overall_mean_sim = mean_sim.mean().item()
 
     return overall_mean_sim
+
+
+def csd_metric(pred_imgs: List[Image.Image], ref_path: str) -> float:
+    csd_model = get_csd_model()
+    ref_imgs = collect_jpg_files(ref_path)
+    ref_imgs = [Image.open(img) for img in ref_imgs]
+
+    return csdimage_metric(pred_imgs, ref_imgs, csd_model)
+
+
+def calculate_cl_metrics(metric_matrix):
+    T = metric_matrix.shape[0]
+
+    avg_accuracies = []
+    for i in range(T):
+        valid_accuracies = [
+            metric_matrix[i, j]
+            for j in range(i + 1)
+            if not np.isnan(metric_matrix[i, j])
+        ]
+        if valid_accuracies:
+            avg_accuracies.append(np.mean(valid_accuracies))
+    final_avg_accuracy = np.mean(avg_accuracies)
+
+    forgetting_values = []
+    for j in range(T):
+        task_accuracies = [
+            metric_matrix[i, j] for i in range(T) if not np.isnan(metric_matrix[i, j])
+        ]
+        if len(task_accuracies) > 1:
+            initial_accuracy = task_accuracies[0]
+            max_forgetting = max(initial_accuracy - acc for acc in task_accuracies[1:])
+            forgetting_values.append(max_forgetting)
+    final_avg_forgetting = np.mean(forgetting_values) if forgetting_values else 0.0
+
+    return final_avg_accuracy, final_avg_forgetting
