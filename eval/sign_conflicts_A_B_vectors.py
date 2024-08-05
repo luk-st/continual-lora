@@ -1,16 +1,15 @@
 import os
 
+import pandas as pd
 import torch
 from diffusers import DiffusionPipeline
-import pandas as pd
-
 
 STYLE_MODELS = [
-    "watercolor_painting_style_sd1_max",
-    "oil_painting_style_sd2_max",
-    "flat_cartoon_illustration_sd3_max",
-    "abstract_rainbow_colored_flowing_smoke_wave_sd4_max",
-    "sticker_sd5_max",
+    "watercolor_painting_style_sd1",
+    "oil_painting_style_sd2",
+    "flat_cartoon_illustration_sd3",
+    "abstract_rainbow_colored_flowing_smoke_wave_sd4",
+    "sticker_sd5",
 ]
 OBJECT_MODELS = [
     "wolf_plushie_sd1",
@@ -20,24 +19,25 @@ OBJECT_MODELS = [
     "cat2_sd5",
 ]
 
-SEEDS = [0]
+SEEDS = [0, 5, 10, 15]
 FINAL_RESULTS_PATH = "./results/sign_conflicts_avaraged_max"
 
+
 def _get_results_dir_path(seed, style=True):
-    return f"./results/sign_conflicts_seed_{seed}_style" if style else f"./results/sign_conflicts_seed_{seed}_object"
+    return (
+        f"./results/sign_conflicts_seed_{seed}_style"
+        if style
+        else f"./results/sign_conflicts_seed_{seed}_object"
+    )
 
 
 def _get_style_models(seed):
-    return [
-        f"./models/seed_{seed}_style/{model_name}"
-        for model_name in STYLE_MODELS
-    ]
+    return [f"./models/seed_{seed}_style/{model_name}" for model_name in STYLE_MODELS]
+
 
 def _get_object_models(seed):
-    return [
-        f"./models/seed_{seed}_object/{model_name}"
-        for model_name in OBJECT_MODELS
-    ]
+    return [f"./models/seed_{seed}_object/{model_name}" for model_name in OBJECT_MODELS]
+
 
 def _get_subtract_models(models_to_subtract):
     return ["stabilityai/stable-diffusion-xl-base-1.0"] + models_to_subtract[:-1]
@@ -46,19 +46,26 @@ def _get_subtract_models(models_to_subtract):
 def _get_params_number_of_layer(layer):
     return layer.shape.numel()
 
+
 def _get_number_of_sign_conflicts(vector_A, vector_B):
     return torch.sum(vector_A.cpu() * vector_B.cpu() < 0).item()
 
+
 def _get_unet_att_weights(model):
     att_weights = {
-        k: v.cpu() for k, v in model.state_dict().items() if any(sub in k for sub in ['to_w', 'to_k', 'to_out', 'to_v'])
+        k: v.cpu()
+        for k, v in model.state_dict().items()
+        if any(sub in k for sub in ["to_w", "to_k", "to_out", "to_v"])
     }
     assert len(att_weights) == 140 * 4
     return att_weights
 
+
 def get_vector_differs(pipe, pipe_to_subtract):
-    main_model_vector = _get_unet_att_weights(pipe.components['unet'])
-    model_to_subtract_vector = _get_unet_att_weights(pipe_to_subtract.components['unet'])
+    main_model_vector = _get_unet_att_weights(pipe.components["unet"])
+    model_to_subtract_vector = _get_unet_att_weights(
+        pipe_to_subtract.components["unet"]
+    )
     vector_differs = {
         k: v - model_to_subtract_vector[k] for k, v in main_model_vector.items()
     }
@@ -91,27 +98,34 @@ def calculate_vector_A_B_signs_conflicts(model_A, model_to_subtract, models_to_c
 
 
 def main(style=True):
-    final_df = pd.DataFrame(index=STYLE_MODELS if style else OBJECT_MODELS, columns=STYLE_MODELS if style else OBJECT_MODELS)
+    final_df = pd.DataFrame(
+        index=STYLE_MODELS if style else OBJECT_MODELS,
+        columns=STYLE_MODELS if style else OBJECT_MODELS,
+    )
     for seed in SEEDS:
         if style:
             models = _get_style_models(seed)
         else:
             models = _get_object_models(seed)
 
-        df = pd.DataFrame(index=STYLE_MODELS if style else OBJECT_MODELS, columns=STYLE_MODELS if style else OBJECT_MODELS)
+        df = pd.DataFrame(
+            index=STYLE_MODELS if style else OBJECT_MODELS,
+            columns=STYLE_MODELS if style else OBJECT_MODELS,
+        )
         models_to_substract = _get_subtract_models(models)
 
         res_path = _get_results_dir_path(seed, style)
-
-        print(final_df)
-        print(df)
 
         print(f"Seed: {seed}")
         print(f"Models: {models}")
         print(f"Models to subtract: {models_to_substract}")
 
-        for (idx, main_model), model_to_subtract in zip(enumerate(models[:-1]), models_to_substract):
-            print(f"Calculating sign conflicts: \n\tMain model: {main_model}\n\tModel to subtract: {model_to_subtract}\n\tModels to compare: {models[idx+1:]}")
+        for (idx, main_model), model_to_subtract in zip(
+            enumerate(models[:-1]), models_to_substract
+        ):
+            print(
+                f"Calculating sign conflicts: \n\tMain model: {main_model}\n\tModel to subtract: {model_to_subtract}\n\tModels to compare: {models[idx+1:]}"
+            )
             model_A = DiffusionPipeline.from_pretrained(
                 main_model, torch_dtype=torch.float16
             )
@@ -119,13 +133,16 @@ def main(style=True):
                 model_to_subtract, torch_dtype=torch.float16
             )
             sign_conflicts_dict = calculate_vector_A_B_signs_conflicts(
-                model_A, model_to_subtract, models[idx+1:]
+                model_A, model_to_subtract, models[idx + 1 :]
             )
             for model_B, sign_conflicts in sign_conflicts_dict.items():
                 main_model = main_model.split("/")[-1]
                 model_B = model_B.split("/")[-1]
                 df.at[model_B, main_model] = sign_conflicts
-                if pd.isna(final_df.at[model_B, main_model]) or final_df.at[model_B, main_model] == '':
+                if (
+                    pd.isna(final_df.at[model_B, main_model])
+                    or final_df.at[model_B, main_model] == ""
+                ):
                     final_df.at[model_B, main_model] = sign_conflicts
                 else:
                     final_df.at[model_B, main_model] += sign_conflicts
