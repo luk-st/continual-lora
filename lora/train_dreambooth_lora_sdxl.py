@@ -47,6 +47,7 @@ from diffusers import (
     EulerDiscreteScheduler,
     StableDiffusionXLPipeline,
     UNet2DConditionModel,
+    DiffusionPipeline,
 )
 from diffusers.loaders import LoraLoaderMixin
 from diffusers.optimization import get_scheduler
@@ -79,6 +80,8 @@ from torchvision import transforms
 from torchvision.transforms.functional import crop
 from tqdm.auto import tqdm
 from transformers import AutoTokenizer, PretrainedConfig
+
+from merging.task_vectors import TaskVector, merge_max_abs
 
 if is_wandb_available():
     import wandb
@@ -760,6 +763,12 @@ def parse_args(input_args=None):
         action="store_true",
         default=False,
         help=("If True, we save merged model to output_dir"),
+    )
+    parser.add_argument(
+        "--save_mag_max",
+        action="store_true",
+        default=False,
+        help=("If True then save the model after selecting the maximum value between the current task vector and the previous tasks vector.")
     )
 
     if input_args is not None:
@@ -2244,6 +2253,7 @@ def main(args):
             variant=args.variant,
             torch_dtype=weight_dtype,
         )
+        previous_tasks_vector = TaskVector(pipeline)
 
         # load attention processors
         pipeline.load_lora_weights(args.output_dir)
@@ -2286,6 +2296,17 @@ def main(args):
         if args.save_whole_model:
             pipeline.fuse_lora(fuse_unet=True)
             pipeline.unload_lora_weights()
+
+            if args.save_mag_max:
+                all_tasks_vector = TaskVector(pipeline)
+                last_task_vector = all_tasks_vector - previous_tasks_vector
+                del pipeline, all_tasks_vector
+                merged_vector = merge_max_abs([previous_tasks_vector, last_task_vector])
+                pipeline = DiffusionPipeline.from_pretrained(
+                    "stabilityai/stable-diffusion-xl-base-1.0", torch_dtype=torch.float16
+                )
+                pipeline.unet = merged_vector.apply_to(pipeline.unet)
+
             pipeline.save_pretrained(args.output_dir)
             lora_path = Path(args.output_dir)
             os.remove((lora_path / "pytorch_lora_weights.safetensors").resolve())

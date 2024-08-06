@@ -1,6 +1,7 @@
 import os
 
 import pandas as pd
+import numpy as np
 import torch
 from diffusers import DiffusionPipeline
 
@@ -97,7 +98,37 @@ def calculate_vector_A_B_signs_conflicts(model_A, model_to_subtract, models_to_c
     return sign_conflicts_dict
 
 
-def main(style=True):
+def calculate_vector_A_B_conflicts_with_norm(model_A, model_to_subtract, models_to_compare):
+    sign_conflicts_dict = {}
+
+    vector_A = get_vector_differs(model_A, model_to_subtract)
+
+    del model_A
+
+    for model_B_path in models_to_compare:
+        model_B = DiffusionPipeline.from_pretrained(
+            model_B_path, torch_dtype=torch.float16
+        )
+        vector_B = get_vector_differs(model_B, model_to_subtract)
+
+        for layer in vector_A:
+            sign_conflict = np.sign(vector_A[layer]) != np.sign(vector_B[layer])
+            vector_B[layer] = np.where(sign_conflict, vector_B[layer], 0)
+
+        flat_vector1 = np.concatenate([val.flatten() for val in vector_A.values()])
+        flat_vector2 = np.concatenate([val.flatten() for val in vector_B.values()])
+
+        norm_vector2 = np.linalg.norm(flat_vector2)
+
+        norm_vector1 = np.linalg.norm(flat_vector1)
+
+        sign_conflicts_dict[model_B_path] = norm_vector2 / norm_vector1
+
+        del model_B
+
+    return sign_conflicts_dict
+
+def main(style=True, norm=True):
     final_df = pd.DataFrame(
         index=STYLE_MODELS if style else OBJECT_MODELS,
         columns=STYLE_MODELS if style else OBJECT_MODELS,
@@ -132,9 +163,14 @@ def main(style=True):
             model_to_subtract = DiffusionPipeline.from_pretrained(
                 model_to_subtract, torch_dtype=torch.float16
             )
-            sign_conflicts_dict = calculate_vector_A_B_signs_conflicts(
-                model_A, model_to_subtract, models[idx + 1 :]
-            )
+            if norm:
+                sign_conflicts_dict = calculate_vector_A_B_conflicts_with_norm(
+                    model_A, model_to_subtract, models[idx + 1 :]
+                )
+            else:
+                sign_conflicts_dict = calculate_vector_A_B_signs_conflicts(
+                    model_A, model_to_subtract, models[idx + 1 :]
+                )
             for model_B, sign_conflicts in sign_conflicts_dict.items():
                 main_model = main_model.split("/")[-1]
                 model_B = model_B.split("/")[-1]
@@ -150,11 +186,11 @@ def main(style=True):
             del model_A
 
         os.makedirs(res_path, exist_ok=True)
-        df.to_csv(os.path.join(res_path, "sign_conflicts.csv"))
+        df.to_csv(os.path.join(res_path, f"sign_conflicts_norm_{norm}_base.csv"))
 
     os.makedirs(FINAL_RESULTS_PATH, exist_ok=True)
     final_df /= len(SEEDS)
-    final_df.to_csv(os.path.join(FINAL_RESULTS_PATH, "sign_conflicts.csv"))
+    final_df.to_csv(os.path.join(FINAL_RESULTS_PATH, f"sign_conflicts_norm_{norm}.csv"))
 
 
 if __name__ == "__main__":
