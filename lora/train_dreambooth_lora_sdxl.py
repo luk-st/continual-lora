@@ -2256,7 +2256,7 @@ def main(args):
         )
         base_pipeline = DiffusionPipeline.from_pretrained(
             "stabilityai/stable-diffusion-xl-base-1.0", torch_dtype=torch.float16
-        ).to("cpu")
+        )
         previous_tasks_vector = TaskVector(pipeline, base_pipeline)
 
         # load attention processors

@@ -1,5 +1,4 @@
 import torch
-from diffusers import DiffusionPipeline
 
 
 class TaskVector:
