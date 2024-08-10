@@ -3,7 +3,7 @@ from diffusers import DiffusionPipeline
 
 
 class TaskVector:
-    def __init__(self, finetuned_checkpoint=None, pretrained_state_path = "res/state_dict_base.pth", vector=None):
+    def __init__(self, finetuned_checkpoint=None, pretrained_checkpoint = None, vector=None):
         """Initializes the task vector from a pretrained and a finetuned checkpoints.
 
         This can either be done by passing two state dicts (one corresponding to the
@@ -14,9 +14,9 @@ class TaskVector:
             self.vector = vector
         else:
             with torch.no_grad():
-                assert finetuned_checkpoint is not None and pretrained_state_path is not None
+                assert finetuned_checkpoint is not None and pretrained_checkpoint is not None
                 with torch.no_grad():
-                    pretrained_state_dict = torch.load(pretrained_state_path)
+                    pretrained_state_dict = pretrained_checkpoint.unet.state_dict()
                     finetuned_state_dict = finetuned_checkpoint.unet.state_dict()
                     self.vector = {}
                     for key in pretrained_state_dict:
@@ -76,15 +76,14 @@ class TaskVector:
         """Apply a task vector to a pretrained model."""
         with torch.no_grad():
             new_state_dict = {}
-            # new_state_dict.to("cuda")
             pretrained_state_dict = pretrained_model.state_dict()
             for key in pretrained_state_dict:
                 if key not in self.vector:
                     print(f'Warning: key {key} is present in the pretrained state dict but not in the task vector')
                     continue
-                new_state_dict[key] = pretrained_state_dict[key].to("cpu") + scaling_coef * self.vector[key].to("cpu")
-                new_state_dict[key].to("cuda")
-
+                new_state_dict[key] = pretrained_state_dict[key] + scaling_coef * self.vector[key]
+                # new_state_dict[key].to("cuda")
+        print("Applying task vector to model")
         pretrained_model.load_state_dict(new_state_dict, strict=False)
         return pretrained_model
 

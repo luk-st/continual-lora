@@ -1357,6 +1357,7 @@ def main(args):
     )
     unet.add_adapter(unet_lora_config)
 
+
     # The text encoder comes from 🤗 transformers, so we cannot directly modify it.
     # So, instead, we monkey-patch the forward calls of its attention-blocks.
     if args.train_text_encoder:
@@ -2253,7 +2254,10 @@ def main(args):
             variant=args.variant,
             torch_dtype=weight_dtype,
         )
-        previous_tasks_vector = TaskVector(pipeline)
+        base_pipeline = DiffusionPipeline.from_pretrained(
+            "stabilityai/stable-diffusion-xl-base-1.0", torch_dtype=torch.float16
+        ).to("cpu")
+        previous_tasks_vector = TaskVector(pipeline, base_pipeline)
 
         # load attention processors
         pipeline.load_lora_weights(args.output_dir)
@@ -2298,9 +2302,10 @@ def main(args):
             pipeline.unload_lora_weights()
 
             if args.save_mag_max:
-                all_tasks_vector = TaskVector(pipeline)
+                all_tasks_vector = TaskVector(pipeline, base_pipeline)
                 last_task_vector = all_tasks_vector - previous_tasks_vector
                 del pipeline, all_tasks_vector
+
                 merged_vector = merge_max_abs([previous_tasks_vector, last_task_vector])
                 pipeline = DiffusionPipeline.from_pretrained(
                     "stabilityai/stable-diffusion-xl-base-1.0", torch_dtype=torch.float16
