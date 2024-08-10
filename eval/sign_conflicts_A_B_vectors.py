@@ -22,11 +22,9 @@ OBJECT_MODELS = [
 ]
 
 SEEDS = [0, 5, 10, 15]
-FINAL_RESULTS_PATH = "./results/sign_conflicts_avaraged"
-
 
 def _get_final_results_path(style):
-    return f"{FINAL_RESULTS_PATH}/{'style' if style else 'object'}_sign_conflicts_avaraged"
+    return f"./results/{'style' if style else 'object'}_sign_conflicts_avaraged"
 
 
 def _get_models(seed, style=True):
@@ -105,7 +103,8 @@ def calculate_sign_conflicts(model_A, model_to_subtract, models_to_compare):
 
 
 def main(style=True):
-    os.makedirs(_get_final_results_path(style), exist_ok=True)
+    res_path = _get_final_results_path(style)
+    os.makedirs(res_path, exist_ok=True)
 
     model_names = STYLE_MODELS if style else OBJECT_MODELS
     final_df = pd.DataFrame(index=model_names, columns=model_names)
@@ -139,8 +138,8 @@ def main(style=True):
     final_df /= len(SEEDS)
     final_df_norm /= len(SEEDS)
 
-    final_df.to_csv(os.path.join(FINAL_RESULTS_PATH, f"sign_conflicts_avg.csv"))
-    final_df_norm.to_csv(os.path.join(FINAL_RESULTS_PATH, f"sign_conflicts_avg_norm.csv"))
+    final_df.to_csv(os.path.join(res_path, f"sign_conflicts_avg.csv"))
+    final_df_norm.to_csv(os.path.join(res_path, f"sign_conflicts_avg_norm.csv"))
 
 
 if __name__ == "__main__":
