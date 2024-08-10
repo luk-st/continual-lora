@@ -21,7 +21,7 @@ OBJECT_MODELS = [
     "cat2_sd5",
 ]
 
-SEEDS = [0, 0]
+SEEDS = [0, 5, 10, 15]
 FINAL_RESULTS_PATH = "./results/sign_conflicts_avaraged"
 
 
