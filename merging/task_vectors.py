@@ -19,6 +19,7 @@ class TaskVector:
                 self.vector = {}
                 for key in pretrained_state_dict:
                     if pretrained_state_dict[key].dtype in [torch.int64, torch.uint8]:
+                        print(f'Warning: key {key} is of type {pretrained_state_dict[key].dtype}, skipping')
                         continue
                     self.vector[key] = finetuned_state_dict[key].to("cpu") - pretrained_state_dict[key].to("cpu")
 
