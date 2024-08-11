@@ -14,14 +14,13 @@ class TaskVector:
         else:
             with torch.no_grad():
                 assert finetuned_checkpoint is not None and pretrained_checkpoint is not None
-                with torch.no_grad():
-                    pretrained_state_dict = pretrained_checkpoint.unet.state_dict()
-                    finetuned_state_dict = finetuned_checkpoint.unet.state_dict()
-                    self.vector = {}
-                    for key in pretrained_state_dict:
-                        if pretrained_state_dict[key].dtype in [torch.int64, torch.uint8]:
-                            continue
-                        self.vector[key] = finetuned_state_dict[key].to("cpu") - pretrained_state_dict[key].to("cpu")
+                pretrained_state_dict = pretrained_checkpoint.unet.state_dict()
+                finetuned_state_dict = finetuned_checkpoint.unet.state_dict()
+                self.vector = {}
+                for key in pretrained_state_dict:
+                    if pretrained_state_dict[key].dtype in [torch.int64, torch.uint8]:
+                        continue
+                    self.vector[key] = finetuned_state_dict[key].to("cpu") - pretrained_state_dict[key].to("cpu")
 
     def __add__(self, other):
         """Add two task vectors together."""
@@ -81,31 +80,15 @@ class TaskVector:
                     print(f'Warning: key {key} is present in the pretrained state dict but not in the task vector')
                     continue
                 new_state_dict[key] = pretrained_state_dict[key] + scaling_coef * self.vector[key]
-                # new_state_dict[key].to("cuda")
+
         print("Applying task vector to model")
         pretrained_model.load_state_dict(new_state_dict, strict=False)
         return pretrained_model
 
-def merge_rnd_mix(task_vectors):
-    """Randomly mix multiple task vectors together."""
-    if len(task_vectors) == 0:
-        return task_vectors[0]
-
-    with torch.no_grad():
-        new_vector = {}
-        for key in task_vectors[0].vector:
-            _rand_indices = torch.randint(0, len(task_vectors), task_vectors[0].vector[key].shape)
-            new_vector[key] = task_vectors[0].vector[key] * (_rand_indices == 0)
-            for i in range(1, len(task_vectors)):
-                new_vector[key] += task_vectors[i].vector[key] * (_rand_indices == i)
-
-    return TaskVector(vector=new_vector)
-
 
 def merge_max_abs(task_vectors):
     """Mix multiple task vectors together by highest parameter value."""
-    if len(task_vectors) == 0:
-        return task_vectors[0]
+    assert len(task_vectors) == 2
 
     with torch.no_grad():
         new_vector = {}

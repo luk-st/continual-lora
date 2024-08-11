@@ -47,7 +47,6 @@ from diffusers import (
     EulerDiscreteScheduler,
     StableDiffusionXLPipeline,
     UNet2DConditionModel,
-    DiffusionPipeline,
 )
 from diffusers.loaders import LoraLoaderMixin
 from diffusers.optimization import get_scheduler
@@ -2254,7 +2253,7 @@ def main(args):
             variant=args.variant,
             torch_dtype=weight_dtype,
         )
-        base_pipeline = DiffusionPipeline.from_pretrained(
+        base_pipeline = StableDiffusionXLPipeline.from_pretrained(
             "stabilityai/stable-diffusion-xl-base-1.0", torch_dtype=torch.float16
         )
         previous_tasks_vector = TaskVector(pipeline, base_pipeline)
@@ -2307,7 +2306,7 @@ def main(args):
                 del pipeline, all_tasks_vector
 
                 merged_vector = merge_max_abs([previous_tasks_vector, last_task_vector])
-                pipeline = DiffusionPipeline.from_pretrained(
+                pipeline = StableDiffusionXLPipeline.from_pretrained(
                     "stabilityai/stable-diffusion-xl-base-1.0", torch_dtype=torch.float16
                 )
                 pipeline.unet = merged_vector.apply_to(pipeline.unet)

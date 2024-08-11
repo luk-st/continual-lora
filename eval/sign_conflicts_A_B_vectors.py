@@ -1,10 +1,10 @@
-import os
 import argparse
+import os
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 import torch
-from diffusers import DiffusionPipeline
+from diffusers import StableDiffusionXLPipeline
 
 STYLE_MODELS = [
     "watercolor_painting_style_sd1",
@@ -22,6 +22,7 @@ OBJECT_MODELS = [
 ]
 
 SEEDS = [0, 5, 10, 15]
+
 
 def _get_final_results_path(style):
     return f"./results/{'style' if style else 'object'}_sign_conflicts_avaraged"
@@ -77,7 +78,9 @@ def calculate_sign_conflicts(model_A, model_to_subtract, models_to_compare):
     sign_conflicts_dict_norm, sign_conflicts_dict = {}, {}
 
     for model_B_path in models_to_compare:
-        model_B = DiffusionPipeline.from_pretrained(model_B_path, torch_dtype=torch.float16)
+        model_B = StableDiffusionXLPipeline.from_pretrained(
+            model_B_path, torch_dtype=torch.float16
+        )
         vector_B = get_vector_differs(model_B, model_to_subtract)
 
         # calculate using number of sign conflicts
@@ -85,7 +88,9 @@ def calculate_sign_conflicts(model_A, model_to_subtract, models_to_compare):
             _get_number_of_sign_conflicts(layer_A, layer_B)
             for layer_A, layer_B in zip(vector_A.values(), vector_B.values())
         )
-        all_params = sum(_get_params_number_of_layer(layer_A) for layer_A in vector_A.values())
+        all_params = sum(
+            _get_params_number_of_layer(layer_A) for layer_A in vector_A.values()
+        )
         sign_conflicts_dict[model_B_path] = (sign_conflicts / all_params) * 100
 
         # calculate using norm of vectors
@@ -93,8 +98,12 @@ def calculate_sign_conflicts(model_A, model_to_subtract, models_to_compare):
             sign_conflict = np.sign(vector_A[layer]) != np.sign(vector_B[layer])
             vector_B[layer] = np.where(sign_conflict, vector_B[layer], 0)
 
-        norm_vector1 = np.linalg.norm(np.concatenate([val.flatten() for val in vector_A.values()]))
-        norm_vector2 = np.linalg.norm(np.concatenate([val.flatten() for val in vector_B.values()]))
+        norm_vector1 = np.linalg.norm(
+            np.concatenate([val.flatten() for val in vector_A.values()])
+        )
+        norm_vector2 = np.linalg.norm(
+            np.concatenate([val.flatten() for val in vector_B.values()])
+        )
         sign_conflicts_dict_norm[model_B_path] = norm_vector2 / norm_vector1
 
         del model_B
@@ -118,16 +127,22 @@ def main(style=True):
         print(f"Models: {models}")
         print(f"Models to subtract: {models_to_subtract}")
 
-        for idx, (main_model, model_to_subtract) in enumerate(zip(models[:-1], models_to_subtract)):
+        for idx, (main_model, model_to_subtract) in enumerate(
+            zip(models[:-1], models_to_subtract)
+        ):
             print(
                 f"Calculating sign conflicts: \n\tMain model: {main_model}\n\tModel to subtract: {model_to_subtract}\n\tModels to compare: {models[idx+1:]}"
             )
 
-            model_A = DiffusionPipeline.from_pretrained(main_model, torch_dtype=torch.float16)
-            model_to_subtract = DiffusionPipeline.from_pretrained(model_to_subtract, torch_dtype=torch.float16)
+            model_A = StableDiffusionXLPipeline.from_pretrained(
+                main_model, torch_dtype=torch.float16
+            )
+            model_to_subtract = StableDiffusionXLPipeline.from_pretrained(
+                model_to_subtract, torch_dtype=torch.float16
+            )
 
             sign_conflicts_dict, sign_conflicts_dict_norm = calculate_sign_conflicts(
-                model_A, model_to_subtract, models[idx + 1:]
+                model_A, model_to_subtract, models[idx + 1 :]
             )
 
             update_final_df(final_df, sign_conflicts_dict, main_model)
@@ -144,7 +159,9 @@ def main(style=True):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--style", action="store_true", help="Calculate for style models")
+    parser.add_argument(
+        "--style", action="store_true", help="Calculate for style models"
+    )
     args = parser.parse_args()
 
     main(style=args.style)
