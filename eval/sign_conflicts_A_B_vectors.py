@@ -21,17 +21,16 @@ OBJECT_MODELS = [
     "cat2_sd5",
 ]
 
-SEEDS = [0, 5, 10, 15]
+SEEDS = [0, 11, 33, 42]
 
 
-def _get_final_results_path(style):
-    return f"./results/{'style' if style else 'object'}_sign_conflicts_avaraged"
+def _get_final_results_path(experiment_type):
+    return f"./results/{experiment_type}_sign_conflicts_avaraged"
 
 
-def _get_models(seed, style=True):
-    model_type = "style" if style else "object"
-    models = STYLE_MODELS if style else OBJECT_MODELS
-    return [f"./models/seed_{seed}_{model_type}/{model_name}" for model_name in models]
+def _get_models(seed, experiment_type):
+    models = STYLE_MODELS if experiment_type == "style" else OBJECT_MODELS
+    return [f"./models/seed_{seed}_{experiment_type}/{model_name}" for model_name in models]
 
 
 def _get_subtract_models(models_to_subtract):
@@ -111,16 +110,16 @@ def calculate_sign_conflicts(model_A, model_to_subtract, models_to_compare):
     return sign_conflicts_dict, sign_conflicts_dict_norm
 
 
-def main(style=True):
-    res_path = _get_final_results_path(style)
+def main(experiment_type=True):
+    res_path = _get_final_results_path(experiment_type)
     os.makedirs(res_path, exist_ok=True)
 
-    model_names = STYLE_MODELS if style else OBJECT_MODELS
+    model_names = STYLE_MODELS if experiment_type == "style" else OBJECT_MODELS
     final_df = pd.DataFrame(index=model_names, columns=model_names)
     final_df_norm = pd.DataFrame(index=model_names, columns=model_names)
 
     for seed in SEEDS:
-        models = _get_models(seed, style)
+        models = _get_models(seed, experiment_type)
         models_to_subtract = _get_subtract_models(models)
 
         print(f"Seed: {seed}")
@@ -160,8 +159,8 @@ def main(style=True):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--style", action="store_true", help="Calculate for style models"
+        "--experiment_type", choices=["style", "object"], required=True, type=str, help="Type of experiment"
     )
     args = parser.parse_args()
 
-    main(style=args.style)
+    main(experiment_type=args.experiment_type)

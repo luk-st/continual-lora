@@ -2303,13 +2303,14 @@ def main(args):
             if args.save_mag_max:
                 all_tasks_vector = TaskVector(pipeline, base_pipeline)
                 last_task_vector = all_tasks_vector - previous_tasks_vector
-                del pipeline, all_tasks_vector
+
+                del pipeline, all_tasks_vector, base_pipeline
 
                 merged_vector = merge_max_abs([previous_tasks_vector, last_task_vector])
                 pipeline = StableDiffusionXLPipeline.from_pretrained(
                     "stabilityai/stable-diffusion-xl-base-1.0", torch_dtype=torch.float16
                 )
-                pipeline.unet = merged_vector.apply_to(pipeline.unet)
+                pipeline = merged_vector.apply_to(pipeline)
 
             pipeline.save_pretrained(args.output_dir)
             lora_path = Path(args.output_dir)

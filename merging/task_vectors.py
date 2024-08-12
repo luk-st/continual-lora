@@ -71,11 +71,11 @@ class TaskVector:
                 new_vector[key] = self.vector[key] * other
         return TaskVector(vector=new_vector)
 
-    def apply_to(self, pretrained_model, scaling_coef=1.0):
+    def apply_to(self, pretrained_pipeline, scaling_coef=1.0):
         """Apply a task vector to a pretrained model."""
         with torch.no_grad():
             new_state_dict = {}
-            pretrained_state_dict = pretrained_model.state_dict()
+            pretrained_state_dict = pretrained_pipeline.unet.state_dict()
             for key in pretrained_state_dict:
                 if key not in self.vector:
                     print(f'Warning: key {key} is present in the pretrained state dict but not in the task vector')
@@ -83,8 +83,8 @@ class TaskVector:
                 new_state_dict[key] = pretrained_state_dict[key] + scaling_coef * self.vector[key]
 
         print("Applying task vector to model")
-        pretrained_model.load_state_dict(new_state_dict, strict=False)
-        return pretrained_model
+        pretrained_pipeline.unet.load_state_dict(new_state_dict, strict=False)
+        return pretrained_pipeline
 
 
 def merge_max_abs(task_vectors):
@@ -97,11 +97,11 @@ def merge_max_abs(task_vectors):
         # Iterate over keys in the first task vector
         for key in task_vectors[0].vector:
             # Get the initial tensor for the current key
-            max_abs_tensor = task_vectors[0].vector[key].to("cuda")
+            max_abs_tensor = task_vectors[0].vector[key]
 
             # Iterate over the remaining task vectors
             for task_vector in task_vectors[1:]:
-                current_tensor = task_vector.vector[key].to("cuda")
+                current_tensor = task_vector.vector[key]
 
                 # Update max_abs_tensor to keep the element-wise maximum absolute values
                 max_abs_tensor = torch.where(current_tensor.abs() >= max_abs_tensor.abs(), current_tensor, max_abs_tensor)
