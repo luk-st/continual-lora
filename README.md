@@ -27,3 +27,6 @@ pip install gdown
 gdown 1FX0xs8p-C7Ob-h5Y4cUhTeOepHzXv_46
 mv checkpoint.pth res/csd_checkpoint.pth
 ```
+
+## Credits
+The repository contains code from [task_vectors](https://github.com/mlfoundations/task_vectors) and [magmax](https://github.com/danielm1405/magmax).
