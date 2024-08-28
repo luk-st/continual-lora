@@ -48,7 +48,6 @@ def save_serialized_lists(path, serialized_lists):
 
 
 def main(object_seed, order_seed):
-    order_seed = order_seed
     path_to_save_models = get_work_dir(object_seed, order_seed)
 
     combined_shuffled = shuffle_lists(
