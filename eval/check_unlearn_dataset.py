@@ -7,8 +7,9 @@ def remove_ds_store(dataset_dir):
     for root, dirs, files in os.walk(dataset_dir):
         for file in files:
             if file == ".DS_Store":
-                os.remove(os.path.join(root, file))
-                print(f"Removed .DS_Store file: {os.path.join(root, file)}")
+                file_path = os.path.join(root, file)
+                os.remove(file_path)
+                print(f"Removed: {file_path}")
 
 
 def check_unlearn_dataset(dataset_dir, metadata_file="metadata.jsonl"):
