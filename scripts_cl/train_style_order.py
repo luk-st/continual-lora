@@ -39,10 +39,7 @@ def generate_train_dataset(style_arg):
         objects = sorted(os.listdir(os.path.join(DATASET_PATH, style)))
         train_object, val_object = random.sample(sorted(objects), k=2)
         imgs = sorted(os.listdir(os.path.join(DATASET_PATH, style, train_object)))
-
-        print(os.path.join(DATASET_PATH, style, train_object))
         chosen_img = random.sample(sorted(list(set(imgs))), k=5)
-        print(chosen_img)
 
         for img in chosen_img:
             path_to_save = os.path.join(DATASET_SCP_PATH, style, train_object)

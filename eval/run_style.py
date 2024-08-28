@@ -1,20 +1,14 @@
+import json
 import os
 
 import torch
 
-from eval.helpers import (
-    average_on_seeds,
-    convert_metrics_to_arrays,
-    get_cl_lora_alignment_metrics,
-    load_pickle,
-    sample_cl_models,
-    save_pickle,
-)
+from eval.helpers import (average_on_seeds, convert_metrics_to_arrays,
+                          get_cl_lora_alignment_metrics, load_pickle,
+                          sample_cl_models, save_pickle)
 from eval.metrics import calculate_cl_metrics
-from eval.plots import (
-    plot_incremental_performance_heatmap,
-    plot_incremental_performance_plot,
-)
+from eval.plots import (plot_incremental_performance_heatmap,
+                        plot_incremental_performance_plot)
 
 SEEDS = [0, 11, 33, 42]
 N_TASKS = 5
@@ -57,8 +51,25 @@ def _get_style_models(seed):
     ]
 
 
+def save_config():
+    config = {
+        "SEEDS": SEEDS,
+        "N_TASKS": N_TASKS,
+        "DATASETS": DATASETS,
+        "PROMPT": [
+            {"STYLES_TOKENS": STYLES_TOKENS},
+            {"PROMPT_TEMPLATES": PROMPT_TEMPLATES},
+        ],
+        "FINAL_RESULTS_PATH": FINAL_RESULTS_PATH,
+        "METRICS": METRICS,
+    }
+    with open(f"{FINAL_RESULTS_PATH}/config.json", "w") as file:
+        json.dump(config, file, indent=4)
+
+
 def get_style_metrics():
     os.makedirs(FINAL_RESULTS_PATH, exist_ok=True)
+    save_config()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     seeds_outs = []
     for seed in SEEDS:
@@ -107,26 +118,32 @@ def get_style_metrics():
     # final_array = load_pickle(f"{FINAL_RESULTS_PATH}/final_metrics.pkl")
 
     plot_incremental_performance_heatmap(
-        arrays=[final_array['csd'],final_array['dino']],
+        arrays=[final_array["csd"], final_array["dino"]],
         names=["CSD", "DINO"],
         n_tasks=N_TASKS,
         name=f"heatmap",
         save_dir=FINAL_RESULTS_PATH,
     )
     plot_incremental_performance_plot(
-        arrays=[final_array['csd'].T,final_array['dino'].T],
+        arrays=[final_array["csd"].T, final_array["dino"].T],
         names=["CSD", "DINO"],
         n_tasks=N_TASKS,
         name=f"plot",
         save_dir=FINAL_RESULTS_PATH,
     )
 
-    dino_avg_accuracy, dino_avg_forgetting = calculate_cl_metrics(final_array['dino'].T[1:, :])
-    csd_avg_accuracy, csd_avg_forgetting = calculate_cl_metrics(final_array['csd'].T[1:, :])
+    dino_avg_accuracy, dino_avg_forgetting = calculate_cl_metrics(
+        final_array["dino"].T[1:, :]
+    )
+    csd_avg_accuracy, csd_avg_forgetting = calculate_cl_metrics(
+        final_array["csd"].T[1:, :]
+    )
 
     with open(f"{FINAL_RESULTS_PATH}/out_cl.txt", "w") as file:
         dino_str = f"DINO AVG_ACC={dino_avg_accuracy}\nDINO AVG_FORGETTING={dino_avg_forgetting}\n"
-        csd_str = f"CSD AVG_ACC={csd_avg_accuracy}\nCSD AVG_FORGETTING={csd_avg_forgetting}\n"
+        csd_str = (
+            f"CSD AVG_ACC={csd_avg_accuracy}\nCSD AVG_FORGETTING={csd_avg_forgetting}\n"
+        )
 
         file.write(dino_str)
         print(dino_str)
