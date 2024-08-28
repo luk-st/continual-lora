@@ -24,6 +24,7 @@ do
   export INSTANCE_DIR=$dataset_dir
   export PROMPT=$train_prompt
   export VALID_PROMPT=$valid_prompt
+  export MODEL_NAME=$MODEL_NAME
 
   $ACCELERATE_PATH launch lora/train_dreambooth_lora_sdxl.py \
     --pretrained_model_name_or_path=$MODEL_NAME  \
@@ -38,7 +39,7 @@ do
     --report_to="wandb" \
     --lr_scheduler="constant" \
     --lr_warmup_steps=0 \
-    --max_train_steps=1 \
+    --max_train_steps=250 \
     --validation_prompt="${VALID_PROMPT}" \
     --validation_epochs=1 \
     --seed=$SEED \
