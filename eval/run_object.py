@@ -1,20 +1,14 @@
+import json
 import os
 
 import torch
 
-from eval.helpers import (
-    average_on_seeds,
-    convert_metrics_to_arrays,
-    get_cl_lora_alignment_metrics,
-    load_pickle,
-    sample_cl_models,
-    save_pickle,
-)
+from eval.helpers import (average_on_seeds, convert_metrics_to_arrays,
+                          get_cl_lora_alignment_metrics, load_pickle,
+                          sample_cl_models, save_pickle)
 from eval.metrics import calculate_cl_metrics
-from eval.plots import (
-    plot_incremental_performance_heatmap,
-    plot_incremental_performance_plot,
-)
+from eval.plots import (plot_incremental_performance_heatmap,
+                        plot_incremental_performance_plot)
 
 SEEDS = [0, 11, 33, 42]
 N_TASKS = 5
@@ -63,8 +57,25 @@ def _get_object_models(seed):
     ]
 
 
+def save_config():
+    config = {
+        "SEEDS": SEEDS,
+        "N_TASKS": N_TASKS,
+        "DATASETS": DATASETS,
+        "PROMPT": [
+            {"OBJECTS_TOKENS": OBJECTS_TOKENS},
+            {"PROMPT_TEMPLATES": PROMPT_TEMPLATES},
+        ],
+        "FINAL_RESULTS_PATH": FINAL_RESULTS_PATH,
+        "METRICS": METRICS,
+    }
+    with open(f"{FINAL_RESULTS_PATH}/config.json", "w") as file:
+        json.dump(config, file)
+
+
 def get_object_metrics():
     os.makedirs(FINAL_RESULTS_PATH, exist_ok=True)
+    save_config()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     seeds_outs = []
     for seed in SEEDS:
