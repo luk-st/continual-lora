@@ -29,7 +29,7 @@ def save_serialized_lists(path, serialized_lists):
 
 
 def generate_train_dataset(style_arg):
-    random.seed(42)  # set seed to be ALWAYS the same
+    random.seed(42)
     dirs = sorted(os.listdir(DATASET_PATH))  # sort to ensure consistent order
     dirs.remove("Seed_Images")  # remove seed images
     random_train_styles = random.sample(sorted(dirs), k=5)
