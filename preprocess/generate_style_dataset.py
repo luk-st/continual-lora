@@ -43,7 +43,7 @@ def copy_images(src_dir: str, dest_dir: str, images: List[str]) -> None:
 def copy_styles(
     train_objects: List[str], metric_objects: List[str], selected_styles: List[str]
 ) -> None:
-    config = []
+    tasks = []
     metric_objects_idx = random.choices(range(1, 21), k=len(metric_objects))
 
     for idx, style in enumerate(selected_styles):
@@ -62,7 +62,7 @@ def copy_styles(
             output_img_path = os.path.join(metric_path, f"{obj}_{obj_idx}.jpg")
             shutil.copy(img_path, output_img_path)
 
-        config.append(
+        tasks.append(
             {
                 "style": " ".join(style.split("_")).lower(),
                 "train_object": " ".join(train_objects[idx].split("_")).lower(),
@@ -72,6 +72,7 @@ def copy_styles(
         )
 
     with open(os.path.join(OBJECT_DATASET_PATH, "config.json"), "w") as f:
+        config = {"tasks": tasks}
         json.dump(config, f, indent=4)
 
 

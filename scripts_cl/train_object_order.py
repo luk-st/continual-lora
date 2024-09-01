@@ -30,17 +30,11 @@ DREAMBOOTH_CLASSES = {
 }
 
 
-def get_work_dir(object_seed, order_seed):
-    return f"./models/seed_{object_seed}_object/seed_{order_seed}_order"
+def get_work_dir(experiment_name, object_seed, order_seed):
+    return f"./models/experiment_name/seed_{object_seed}_object/seed_{order_seed}_order"
 
 
-def save_serialized_lists(path, serialized_lists):
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w") as f:
-        f.write("\n".join(serialized_lists))
-
-
-def main(object_seed, order_seed):
+def main(experiment_name, object_seed, order_seed):
     path_to_save_models = get_work_dir(object_seed, order_seed)
     os.makedirs(path_to_save_models, exist_ok=True)
 
@@ -69,7 +63,7 @@ def main(object_seed, order_seed):
         json.dump(train_objects, f, indent=4)
 
     subprocess.run(
-        ["sh", "./scripts_cl/train_lora_args.sh", str(object_seed), path_to_save_models]
+        ["sh", "./scripts_cl/train_lora_args.sh", str(object_seed), path_to_save_models, experiment_name]
         + serialized_lists, check=True
     )
 
@@ -82,11 +76,13 @@ if __name__ == "__main__":
         "--object_seed", type=int, required=True, help="Seed for training"
     )
     parser.add_argument(
-        "--order_seed",
-        type=int,
+        "--experiment_name",
+        type=str,
         required=True,
-        help="Seed for shuffling the order of training",
+        default="merge_and_init",
+        help="Name of the experiment",
+        choices=["merge_and_init", "mag_max_light"],
     )
 
     args = parser.parse_args()
-    main(args.object_seed, args.order_seed)
+    main(args.experiment_name, args.object_seed, args.order_seed)

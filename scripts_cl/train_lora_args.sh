@@ -5,10 +5,14 @@ export ACCELERATE_PATH="/net/tscratch/people/plgkzaleska/envs/lora/bin/accelerat
 export RANK=64
 export SEED=$(($1))
 export WORK_DIR=$2
+export EXPERIMENT_NAME=$3
 export MODEL_NAME="stabilityai/stable-diffusion-xl-base-1.0"
 
 echo "Seed: $SEED, Work dir: $WORK_DIR"
 echo "Model name: $MODEL_NAME"
+echo "Experiment name: $EXPERIMENT_NAME"
+
+shift 3
 
 for arg in "$@"
 do
@@ -34,18 +38,18 @@ do
     --rank=$RANK \
     --resolution=1024 \
     --train_batch_size=1 \
-    --learning_rate=1e-4 \
+    --learning_rate=5e-5 \
     --report_to="wandb" \
     --lr_scheduler="constant" \
     --lr_warmup_steps=0 \
-    --max_train_steps=1 \
+    --max_train_steps=1000 \
     --validation_prompt="${VALID_PROMPT}" \
-    --validation_epochs=1 \
+    --validation_epochs=250 \
     --seed=$SEED \
     --enable_xformers_memory_efficient_attention \
     --gradient_checkpointing \
     --use_8bit_adam \
-    --save_whole_model
+    --experiment_name=$EXPERIMENT_NAME \
 
   export MODEL_NAME=$OUTPUT_DIR
   wait
