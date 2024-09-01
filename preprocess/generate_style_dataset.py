@@ -64,8 +64,8 @@ def copy_styles(
 
         tasks.append(
             {
-                "style": " ".join(style.split("_")).lower(),
-                "train_object": " ".join(train_objects[idx].split("_")).lower(),
+                "style": style.lower().replace("_", " "),
+                "train_object": train_objects[idx].lower().replace("_", " "),
                 "train_path": train_path,
                 "metric_path": metric_path,
             }
