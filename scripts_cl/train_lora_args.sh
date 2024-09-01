@@ -1,7 +1,7 @@
 #!/bin/sh
 
 export VAE_PATH="madebyollin/sdxl-vae-fp16-fix"
-export ACCELERATE_PATH="/net/tscratch/people/plgkzaleska/envs/lora/bin/accelerate"
+export ACCELERATE_PATH="accelerate"
 export RANK=64
 export SEED=$(($1))
 export WORK_DIR=$2

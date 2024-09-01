@@ -30,9 +30,7 @@ DREAMBOOTH_CLASSES = {
 
 
 def get_work_dir(experiment_name: str, object_seed: int, order_seed: int) -> str:
-    return (
-        f"./models/{experiment_name}/seed_{object_seed}_object/seed_{order_seed}_order"
-    )
+    return f"./models/{experiment_name}/seed_{object_seed}_object/seed_{order_seed}_order"
 
 
 def main(experiment_name: str, object_seed: int, order_seed: int) -> None:
@@ -56,14 +54,12 @@ def main(experiment_name: str, object_seed: int, order_seed: int) -> None:
         valid_prompt = VALID_PROMPT.format(task["prompt"])
         task["train_prompt"] = train_prompt
         task["valid_prompt"] = valid_prompt
-        serialized_lists.append(
-            f"{task['index']},{train_prompt},{valid_prompt},{task['path']}"
-        )
+        serialized_lists.append(f"{task['index']},{train_prompt},{valid_prompt},{task['path']}")
 
     with open(os.path.join(path_to_save_models, "config.json"), "w") as f:
         json.dump(train_objects, f, indent=4)
 
-    subprocess.run(
+    subprocess.call(
         [
             "sh",
             "./scripts_cl/train_lora_args.sh",
@@ -72,17 +68,12 @@ def main(experiment_name: str, object_seed: int, order_seed: int) -> None:
             experiment_name,
         ]
         + serialized_lists,
-        check=True,
     )
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Run token training in different order"
-    )
-    parser.add_argument(
-        "--object_seed", type=int, required=True, help="Seed for training"
-    )
+    parser = argparse.ArgumentParser(description="Run token training in different order")
+    parser.add_argument("--object_seed", type=int, required=True, help="Seed for training")
     parser.add_argument(
         "--order_seed",
         type=int,
