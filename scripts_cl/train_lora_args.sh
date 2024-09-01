@@ -10,13 +10,12 @@ export MODEL_NAME="stabilityai/stable-diffusion-xl-base-1.0"
 echo "Seed: $SEED, Work dir: $WORK_DIR"
 echo "Model name: $MODEL_NAME"
 
-shift 2
-
 for arg in "$@"
 do
   IFS="," read -r index train_prompt valid_prompt dataset_dir <<< "$arg"
 
-  echo "Train prompt: $train_prompt Validation prompt: $valid_prompt, Dataset dir: $dataset_dir"
+  echo "TASK $index"
+  echo "Train prompt: $train_prompt Validation prompt: $valid_prompt, Dataset dir: $dataset_dir, Model name: $MODEL_NAME"
 
   export OUTPUT_DIR="${WORK_DIR}/${index}"
 
@@ -39,7 +38,7 @@ do
     --report_to="wandb" \
     --lr_scheduler="constant" \
     --lr_warmup_steps=0 \
-    --max_train_steps=250 \
+    --max_train_steps=1 \
     --validation_prompt="${VALID_PROMPT}" \
     --validation_epochs=1 \
     --seed=$SEED \
