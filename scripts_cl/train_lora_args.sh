@@ -22,8 +22,6 @@ do
   echo "Train prompt: $train_prompt Validation prompt: $valid_prompt, Dataset dir: $dataset_dir, Model name: $MODEL_NAME"
 
   export OUTPUT_DIR="${WORK_DIR}/${index}"
-
-  echo "Output dir: $OUTPUT_DIR"
   export INSTANCE_DIR=$dataset_dir
   export PROMPT=$train_prompt
   export VALID_PROMPT=$valid_prompt
