@@ -758,10 +758,12 @@ def parse_args(input_args=None):
         ),
     )
     parser.add_argument(
-        "--save_whole_model",
-        action="store_true",
-        default=False,
-        help=("If True, we save merged model to output_dir"),
+        "--experiment_name",
+        type=str,
+        required=True,
+        default="merge_and_init",
+        help="Name of the experiment",
+        choices=["merge_and_init", "mag_max_light"],
     )
     parser.add_argument(
         "--save_mag_max",
@@ -2296,11 +2298,11 @@ def main(args):
                 ignore_patterns=["step_*", "epoch_*"],
             )
 
-        if args.save_whole_model:
+        if args.experiment_name in ["merge_and_init", "mag_max_light"]:
             pipeline.fuse_lora(fuse_unet=True)
             pipeline.unload_lora_weights()
 
-            if args.save_mag_max:
+            if args.experiment_name == "mag_max_light":
                 all_tasks_vector = TaskVector(pipeline, base_pipeline)
                 last_task_vector = all_tasks_vector - previous_tasks_vector
 

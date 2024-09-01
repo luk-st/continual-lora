@@ -25,5 +25,5 @@ def check_unlearn_dataset(dataset_dir, metadata_file="metadata.jsonl"):
 
 
 if __name__ == "__main__":
-    dataset_dir = "/net/tscratch/people/plgkzaleska/ziplora-analysis/data/temp/combine"
+    dataset_dir = "data/style_unlearn"
     check_unlearn_dataset(dataset_dir)
