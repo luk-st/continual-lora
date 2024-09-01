@@ -59,7 +59,6 @@ def create_config_file(
     selected_objects: Dict[str, str], tokens: List[str], path: str
 ) -> None:
     tasks = []
-    print(selected_objects)
     for idx, cls in enumerate(selected_objects.keys()):
         prompt = TRAIN_PROMPT_TEMPLATE.format(tokens[idx], cls)
         tasks.append(
@@ -67,7 +66,7 @@ def create_config_file(
                 "prompt": prompt,
                 "path": os.path.join(path, selected_objects[cls]),
                 "class": cls,
-                "object": selected_objects[cls],
+                "object": selected_objects[cls].replace("_", " "),
                 "token": tokens[idx],
             }
         )
