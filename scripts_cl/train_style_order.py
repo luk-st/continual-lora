@@ -1,7 +1,7 @@
 import argparse
+import json
 import os
 import random
-import json
 import subprocess
 
 STYLE_DATASET_CONFIG = "data/data_style/config.json"
@@ -10,18 +10,17 @@ TRAIN_PROMPT_TEMPLATE = "{} image of {}"
 VALID_PROMPT = "{} image of pen in the jungle"
 
 
-def get_work_dir(experiment_name, style_seed, order_seed):
-    return (
-        f"./models/{experiment_name}/seed_{style_seed}_style/seed_{order_seed}_order"
-    )
+def get_work_dir(experiment_name: str, style_seed: int, order_seed: int) -> str:
+    return f"./models/{experiment_name}/seed_{style_seed}_style/seed_{order_seed}_order"
 
 
-def save_serialized_lists(path, serialized_lists):
+def save_serialized_lists(path: str, serialized_lists: list) -> None:
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w") as f:
         f.write("\n".join(serialized_lists))
 
-def main(experiment_name, style_seed, order_seed):
+
+def main(experiment_name: str, style_seed: int, order_seed: int) -> None:
     path_to_save_models = get_work_dir(experiment_name, style_seed, order_seed)
     os.makedirs(path_to_save_models, exist_ok=True)
 
@@ -36,7 +35,9 @@ def main(experiment_name, style_seed, order_seed):
 
     for idx, task in enumerate(train_styles["tasks"]):
         task["index"] = idx
-        task["train_prompt"] = TRAIN_PROMPT_TEMPLATE.format(task["style"], task["train_object"])
+        task["train_prompt"] = TRAIN_PROMPT_TEMPLATE.format(
+            task["style"], task["train_object"]
+        )
         task["valid_prompt"] = VALID_PROMPT.format(task["style"])
         serialized_lists.append(
             f"{task['index']},{task['train_prompt']},{task['valid_prompt']},{task['train_path']}"
@@ -46,7 +47,13 @@ def main(experiment_name, style_seed, order_seed):
         json.dump(train_styles, f, indent=4)
 
     subprocess.call(
-        ["sh", "./scripts_cl/train_lora_args.sh", str(style_seed), path_to_save_models, experiment_name]
+        [
+            "sh",
+            "./scripts_cl/train_lora_args.sh",
+            str(style_seed),
+            path_to_save_models,
+            experiment_name,
+        ]
         + serialized_lists
     )
 
