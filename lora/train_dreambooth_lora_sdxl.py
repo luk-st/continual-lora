@@ -802,7 +802,7 @@ def parse_args(input_args=None):
 
 def init_lora_with_checkpoint(unet, lora_path, accelerator, verify: bool=True):
     if verify:
-        unet_lora_params_before = [p.clone().cpu() for p in unet.parameters() if p.requires_grad]
+        unet_lora_params_before = {p_n: p.clone().cpu() for (p_n, p) in unet.named_parameters() if p.requires_grad}
 
     prev_lora_state_dict, _ = LoraLoaderMixin.lora_state_dict(lora_path)
     prev_lora_state_dict = {
@@ -818,13 +818,11 @@ def init_lora_with_checkpoint(unet, lora_path, accelerator, verify: bool=True):
                 param.copy_(prev_lora_state_dict[name].to(accelerator.device))
 
     if verify:
-        unet_lora_params_after = [p.clone().cpu() for p in unet.parameters() if p.requires_grad]
-        for p_before, p_after in tqdm(zip(unet_lora_params_before, unet_lora_params_after), desc="Verifying loading LoRAs 1/2"):
-            assert not torch.equal(p_before, p_after)
-        unet_lora_params_prev_task = [p_v.clone().cpu() for (p_n, p_v) in prev_lora_state_dict.items()]
-        for p_prevtask, p_after in tqdm(zip(unet_lora_params_prev_task, unet_lora_params_after), desc="Verifying loading LoRAs 2/2"):
-            assert torch.equal(p_prevtask, p_after)
-
+        unet_lora_params_after = {p_n: p.clone().cpu() for (p_n,p) in unet.named_parameters() if p.requires_grad}
+        for k_to_check in tqdm(list(unet_lora_params_after), desc="Verifying loading LoRAs 1/2"):
+            assert not torch.equal(unet_lora_params_after[k_to_check], unet_lora_params_before[k_to_check])
+        for k_to_check in tqdm(list(unet_lora_params_after), desc="Verifying loading LoRAs 2/2"):
+            assert torch.equal(unet_lora_params_after[k_to_check], prev_lora_state_dict[k_to_check])
     return unet
 
 class DreamBoothDataset(Dataset):
