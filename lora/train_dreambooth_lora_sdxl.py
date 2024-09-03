@@ -21,11 +21,11 @@ import logging
 import math
 import os
 import random
+import re
 import shutil
 import warnings
 from contextlib import nullcontext
 from pathlib import Path
-import re
 
 import diffusers
 import numpy as np
@@ -750,7 +750,7 @@ def parse_args(input_args=None):
         type=str,
         required=True,
         help="Name of the experiment",
-        choices=["merge_and_init", "mag_max_light", "naive_cl"],
+        choices=["merge_and_init", "mag_max_light", "naive_cl", "ortho_init"],
     )
     parser.add_argument(
         "--save_mag_max",
@@ -823,6 +823,60 @@ def init_lora_with_checkpoint(unet, lora_path, accelerator, verify: bool=True):
             assert not torch.equal(unet_lora_params_after[k_to_check], unet_lora_params_before[k_to_check])
         for k_to_check in tqdm(list(unet_lora_params_after), desc="Verifying loading LoRAs 2/2"):
             assert torch.equal(unet_lora_params_after[k_to_check], prev_lora_state_dict[k_to_check])
+    return unet
+
+def init_lora_with_checkpoint_rotate(unet, lora_path, accelerator, verify: bool=True):
+
+    @torch.no_grad()
+    def find_orthogonal_vector_svd(v):
+        # use SVD to obtain orthogonalized vector during initialization
+        assert len(v.shape) == 1
+        v = v.view(1, -1)
+        _, _, vh = torch.linalg.svd(v)
+        ortho_vec = vh[-1, :]
+        return ortho_vec
+
+    @torch.no_grad()
+    def get_matrix_ortho_columns(matrix):
+        assert len(matrix.shape) == 2
+        return torch.stack([
+            find_orthogonal_vector_svd(matrix[:, idx]) for idx in range(matrix.shape[1])
+        ]).T
+
+    if verify:
+        unet_lora_params_before_A = {p_n: p.clone().cpu() for (p_n, p) in unet.named_parameters() if p.requires_grad and "lora_A" in p_n}
+        unet_lora_params_before_B = {p_n: p.clone().cpu() for (p_n, p) in unet.named_parameters() if p.requires_grad and "lora_B" in p_n}
+
+    prev_lora_state_dict, _ = LoraLoaderMixin.lora_state_dict(lora_path)
+    prev_lora_state_dict = {
+        f'{k.replace("unet.", "")}': v for k, v in prev_lora_state_dict.items() if k.startswith("unet.")
+    }
+    prev_lora_state_dict = convert_unet_state_dict_to_peft(prev_lora_state_dict)
+    prev_lora_state_dict = {
+        re.sub(".weight", ".default.weight", p): w for (p,w) in prev_lora_state_dict.items()
+    }
+    prev_lora_state_dict_A = {
+        p: w for (p,w) in prev_lora_state_dict.items() if "lora_A" in p
+    }
+
+    for name, param in tqdm(unet.named_parameters(), desc="LoRA A orthogonalization with rotation"):
+        if name in prev_lora_state_dict and param.requires_grad:
+            if "lora_A" in name:        # we only orthogonalize A matrices
+                with torch.no_grad():
+                    param.copy_(get_matrix_ortho_columns(prev_lora_state_dict[name]).to(accelerator.device))
+
+    if verify:
+        unet_lora_params_after_A = {p_n: p.clone().cpu() for (p_n,p) in unet.named_parameters() if p.requires_grad and "lora_A" in p_n}
+        unet_lora_params_after_B = {p_n: p.clone().cpu() for (p_n,p) in unet.named_parameters() if p.requires_grad and "lora_B" in p_n}
+
+        for k_to_check in tqdm(list(unet_lora_params_after_A), desc="Verifying loading LoRAs 1/2 (A)"):
+            assert not torch.equal(unet_lora_params_after_A[k_to_check], unet_lora_params_before_A[k_to_check])
+            for idx in range(unet_lora_params_after_A[k_to_check].shape[1]):
+                assert F.cosine_similarity(unet_lora_params_after_A[k_to_check][:,idx:idx+1].T, prev_lora_state_dict_A[k_to_check][:,idx:idx+1].T).item() < 0.0001
+
+        for k_to_check in tqdm(list(unet_lora_params_after_B), desc="Verifying loading LoRAs 2/2 (B)"):
+            assert torch.equal(unet_lora_params_after_B[k_to_check], unet_lora_params_before_B[k_to_check])
+
     return unet
 
 class DreamBoothDataset(Dataset):
@@ -1381,6 +1435,12 @@ def main(args):
         else:
             unet = init_lora_with_checkpoint(unet=unet, lora_path=args.lora_path, accelerator=accelerator)
 
+    if args.experiment_name in ["ortho_init"]:
+        if args.lora_path is None or args.lora_path == "":
+            pass
+        else:
+            unet = init_lora_with_checkpoint_rotate(unet=unet, lora_path=args.lora_path, accelerator=accelerator)
+
     # The text encoder comes from 🤗 transformers, so we cannot directly modify it.
     # So, instead, we monkey-patch the forward calls of its attention-blocks.
     if args.train_text_encoder:
@@ -1589,43 +1649,8 @@ def main(args):
             weight_decay=args.adam_weight_decay,
             eps=args.adam_epsilon,
         )
-
-    if args.optimizer.lower() == "prodigy":
-        try:
-            import prodigyopt
-        except ImportError:
-            raise ImportError(
-                "To use Prodigy, please install the prodigyopt library: `pip install prodigyopt`"
-            )
-
-        optimizer_class = prodigyopt.Prodigy
-
-        if args.learning_rate <= 0.1:
-            logger.warning(
-                "Learning rate is too low. When using prodigy, it's generally better to set learning rate around 1.0"
-            )
-        if args.train_text_encoder and args.text_encoder_lr:
-            logger.warning(
-                f"Learning rates were provided both for the unet and the text encoder- e.g. text_encoder_lr:"
-                f" {args.text_encoder_lr} and learning_rate: {args.learning_rate}. "
-                f"When using prodigy only learning_rate is used as the initial learning rate."
-            )
-            # changes the learning rate of text_encoder_parameters_one and text_encoder_parameters_two to be
-            # --learning_rate
-            params_to_optimize[1]["lr"] = args.learning_rate
-            params_to_optimize[2]["lr"] = args.learning_rate
-
-        optimizer = optimizer_class(
-            params_to_optimize,
-            lr=args.learning_rate,
-            betas=(args.adam_beta1, args.adam_beta2),
-            beta3=args.prodigy_beta3,
-            weight_decay=args.adam_weight_decay,
-            eps=args.adam_epsilon,
-            decouple=args.prodigy_decouple,
-            use_bias_correction=args.prodigy_use_bias_correction,
-            safeguard_warmup=args.prodigy_safeguard_warmup,
-        )
+    else:
+        raise NotImplementedError("Prodigy not usable")
 
     # Dataset and DataLoaders creation:
     train_dataset = DreamBoothDataset(
@@ -2324,7 +2349,8 @@ def main(args):
         if args.experiment_name in ["naive_cl"]:
             # just don't remove LoRA weights
             pass
-        elif args.experiment_name in ["merge_and_init", "mag_max_light"]:
+
+        elif args.experiment_name in ["merge_and_init", "mag_max_light", "ortho_init"]:
             # we merge LoRAs to U-Net
             pipeline.fuse_lora(fuse_unet=True)
             pipeline.unload_lora_weights()
@@ -2344,7 +2370,8 @@ def main(args):
             # eventually we store whole pipeline + remove adapters
             pipeline.save_pretrained(args.output_dir)
             lora_path = Path(args.output_dir)
-            os.remove((lora_path / "pytorch_lora_weights.safetensors").resolve())
+            if args.experiment_name != "ortho_init":
+                os.remove((lora_path / "pytorch_lora_weights.safetensors").resolve())
 
     accelerator.end_training()
 

@@ -9,8 +9,9 @@ STYLE_DATASET_CONFIG = "data/data_style/config.json"
 TRAIN_PROMPT_TEMPLATE = "{} image of {}"
 VALID_PROMPT = "{} image of pen in the jungle"
 
-SCRIPT_PATH_LORA = "./scripts_cl/train_lora_args_naive.sh"
-SCRIPT_PATH_MERGE = "./scripts_cl/train_lora_args_naive.sh"
+SCRIPT_PATH_LORA="./scripts_cl/train_lora_args_naive.sh"
+SCRIPT_PATH_ORTHO_INIT="./scripts_cl/train_lora_args_ortho_init.sh"
+SCRIPT_PATH_MERGE="./scripts_cl/train_lora_args.sh"
 
 
 def get_work_dir(experiment_name: str, style_seed: int, order_seed: int) -> str:
@@ -28,6 +29,8 @@ def main(experiment_name: str, style_seed: int, order_seed: int) -> None:
         script_path = SCRIPT_PATH_MERGE
     elif experiment_name in ["naive_cl"]:
         script_path = SCRIPT_PATH_LORA
+    elif experiment_name in ["ortho_init"]:
+        script_path = SCRIPT_PATH_ORTHO_INIT
     else:
         raise NotImplementedError(f"Unknown experiment name: {experiment_name}")
 
@@ -77,9 +80,8 @@ if __name__ == "__main__":
         "--experiment_name",
         type=str,
         required=True,
-        default="merge_and_init",
         help="Name of the experiment",
-        choices=["merge_and_init", "mag_max_light"],
+        choices=["merge_and_init", "mag_max_light", "naive_cl", "ortho_init"],
     )
 
     args = parser.parse_args()

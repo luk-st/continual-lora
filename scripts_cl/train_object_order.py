@@ -10,7 +10,8 @@ TRAIN_PROMPT_TEMPLATE = "a photo of {}"
 VALID_PROMPT = "a {} in the jungle"
 
 SCRIPT_PATH_LORA="./scripts_cl/train_lora_args_naive.sh"
-SCRIPT_PATH_MERGE="./scripts_cl/train_lora_args_naive.sh"
+SCRIPT_PATH_ORTHO_INIT="./scripts_cl/train_lora_args_ortho_init.sh"
+SCRIPT_PATH_MERGE="./scripts_cl/train_lora_args.sh"
 
 
 DREAMBOOTH_CLASSES = {
@@ -41,6 +42,8 @@ def main(experiment_name: str, object_seed: int, order_seed: int) -> None:
         script_path = SCRIPT_PATH_MERGE
     elif experiment_name in ["naive_cl"]:
         script_path = SCRIPT_PATH_LORA
+    elif experiment_name in ["ortho_init"]:
+        script_path = SCRIPT_PATH_ORTHO_INIT
     else:
         raise NotImplementedError(f"Unknown experiment name: {experiment_name}")
 
@@ -95,7 +98,7 @@ if __name__ == "__main__":
         type=str,
         required=True,
         help="Name of the experiment",
-        choices=["merge_and_init", "mag_max_light", "naive_cl"],
+        choices=["merge_and_init", "mag_max_light", "naive_cl", "ortho_init"],
     )
 
     args = parser.parse_args()
