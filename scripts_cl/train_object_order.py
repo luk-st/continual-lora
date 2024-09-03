@@ -9,6 +9,8 @@ OBJECT_DATASET_CONFIG = "data/data_object/config.json"
 TRAIN_PROMPT_TEMPLATE = "a photo of {}"
 VALID_PROMPT = "a {} in the jungle"
 
+SCRIPT_PATH="./scripts_cl/train_lora_args_naive.sh"
+
 
 DREAMBOOTH_CLASSES = {
     "backpack": ["backpack", "backpack_dog"],
@@ -62,7 +64,7 @@ def main(experiment_name: str, object_seed: int, order_seed: int) -> None:
     subprocess.call(
         [
             "sh",
-            "./scripts_cl/train_lora_args.sh",
+            SCRIPT_PATH,
             str(object_seed),
             path_to_save_models,
             experiment_name,
@@ -84,9 +86,8 @@ if __name__ == "__main__":
         "--experiment_name",
         type=str,
         required=True,
-        default="merge_and_init",
         help="Name of the experiment",
-        choices=["merge_and_init", "mag_max_light"],
+        choices=["merge_and_init", "mag_max_light", "naive_cl"],
     )
 
     args = parser.parse_args()

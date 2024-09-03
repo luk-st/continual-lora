@@ -25,6 +25,7 @@ import shutil
 import warnings
 from contextlib import nullcontext
 from pathlib import Path
+import re
 
 import diffusers
 import numpy as np
@@ -34,36 +35,23 @@ import torch.utils.checkpoint
 import transformers
 from accelerate import Accelerator
 from accelerate.logging import get_logger
-from accelerate.utils import (
-    DistributedDataParallelKwargs,
-    ProjectConfiguration,
-    set_seed,
-)
-from diffusers import (
-    AutoencoderKL,
-    DDPMScheduler,
-    DPMSolverMultistepScheduler,
-    EDMEulerScheduler,
-    EulerDiscreteScheduler,
-    StableDiffusionXLPipeline,
-    UNet2DConditionModel,
-)
+from accelerate.utils import (DistributedDataParallelKwargs,
+                              ProjectConfiguration, set_seed)
+from diffusers import (AutoencoderKL, DDPMScheduler,
+                       DPMSolverMultistepScheduler, EDMEulerScheduler,
+                       EulerDiscreteScheduler, StableDiffusionXLPipeline,
+                       UNet2DConditionModel)
 from diffusers.loaders import LoraLoaderMixin
 from diffusers.optimization import get_scheduler
-from diffusers.training_utils import (
-    _set_state_dict_into_text_encoder,
-    cast_training_params,
-    compute_snr,
-)
-from diffusers.utils import (
-    check_min_version,
-    convert_all_state_dict_to_peft,
-    convert_state_dict_to_diffusers,
-    convert_state_dict_to_kohya,
-    convert_unet_state_dict_to_peft,
-    is_wandb_available,
-)
-from diffusers.utils.hub_utils import load_or_create_model_card, populate_model_card
+from diffusers.training_utils import (_set_state_dict_into_text_encoder,
+                                      cast_training_params, compute_snr)
+from diffusers.utils import (check_min_version, convert_all_state_dict_to_peft,
+                             convert_state_dict_to_diffusers,
+                             convert_state_dict_to_kohya,
+                             convert_unet_state_dict_to_peft,
+                             is_wandb_available)
+from diffusers.utils.hub_utils import (load_or_create_model_card,
+                                       populate_model_card)
 from diffusers.utils.import_utils import is_xformers_available
 from diffusers.utils.torch_utils import is_compiled_module
 from huggingface_hub import create_repo, hf_hub_download, upload_folder
@@ -761,15 +749,20 @@ def parse_args(input_args=None):
         "--experiment_name",
         type=str,
         required=True,
-        default="merge_and_init",
         help="Name of the experiment",
-        choices=["merge_and_init", "mag_max_light"],
+        choices=["merge_and_init", "mag_max_light", "naive_cl"],
     )
     parser.add_argument(
         "--save_mag_max",
         action="store_true",
         default=False,
         help=("If True then save the model after selecting the maximum value between the current task vector and the previous tasks vector.")
+    )
+    parser.add_argument(
+        "--lora_path",
+        type=str,
+        default=None,
+        help="Path to the LoRA checkpoint to initialize the model with."
     )
 
     if input_args is not None:
@@ -807,6 +800,32 @@ def parse_args(input_args=None):
 
     return args
 
+def init_lora_with_checkpoint(unet, lora_path, accelerator, verify: bool=True):
+    if verify:
+        unet_lora_params_before = [p.clone().cpu() for p in unet.parameters() if p.requires_grad]
+
+    prev_lora_state_dict, _ = LoraLoaderMixin.lora_state_dict(lora_path)
+    prev_lora_state_dict = {
+        f'{k.replace("unet.", "")}': v for k, v in prev_lora_state_dict.items() if k.startswith("unet.")
+    }
+    prev_lora_state_dict = convert_unet_state_dict_to_peft(prev_lora_state_dict)
+    prev_lora_state_dict = {
+        re.sub(".weight", ".default.weight", p): w for (p,w) in prev_lora_state_dict.items()
+    }
+    for name, param in unet.named_parameters():
+        if name in prev_lora_state_dict and param.requires_grad:
+            with torch.no_grad():
+                param.copy_(prev_lora_state_dict[name].to(accelerator.device))
+
+    if verify:
+        unet_lora_params_after = [p.clone().cpu() for p in unet.parameters() if p.requires_grad]
+        for p_before, p_after in tqdm(zip(unet_lora_params_before, unet_lora_params_after), desc="Verifying loading LoRAs 1/2"):
+            assert not torch.equal(p_before, p_after)
+        unet_lora_params_prev_task = [p_v.clone().cpu() for (p_n, p_v) in prev_lora_state_dict.items()]
+        for p_prevtask, p_after in tqdm(zip(unet_lora_params_prev_task, unet_lora_params_after), desc="Verifying loading LoRAs 2/2"):
+            assert torch.equal(p_prevtask, p_after)
+
+    return unet
 
 class DreamBoothDataset(Dataset):
     """
@@ -1358,6 +1377,11 @@ def main(args):
     )
     unet.add_adapter(unet_lora_config)
 
+    if args.experiment_name in ["naive_cl"]:
+        if args.lora_path is None or args.lora_path == "":
+            pass
+        else:
+            unet = init_lora_with_checkpoint(unet=unet, lora_path=args.lora_path, accelerator=accelerator)
 
     # The text encoder comes from 🤗 transformers, so we cannot directly modify it.
     # So, instead, we monkey-patch the forward calls of its attention-blocks.
@@ -2298,14 +2322,19 @@ def main(args):
                 ignore_patterns=["step_*", "epoch_*"],
             )
 
-        if args.experiment_name in ["merge_and_init", "mag_max_light"]:
+        # cl lora postprocess
+        if args.experiment_name in ["naive_cl"]:
+            # just don't remove LoRA weights
+            pass
+        elif args.experiment_name in ["merge_and_init", "mag_max_light"]:
+            # we merge LoRAs to U-Net
             pipeline.fuse_lora(fuse_unet=True)
             pipeline.unload_lora_weights()
 
             if args.experiment_name == "mag_max_light":
+                # if we do MagMax, we perform MagMax on weights before saving
                 all_tasks_vector = TaskVector(pipeline, base_pipeline)
                 last_task_vector = all_tasks_vector - previous_tasks_vector
-
                 del pipeline, all_tasks_vector, base_pipeline
 
                 merged_vector = merge_max_abs([previous_tasks_vector, last_task_vector])
@@ -2314,6 +2343,7 @@ def main(args):
                 )
                 pipeline = merged_vector.apply_to(pipeline)
 
+            # eventually we store whole pipeline + remove adapters
             pipeline.save_pretrained(args.output_dir)
             lora_path = Path(args.output_dir)
             os.remove((lora_path / "pytorch_lora_weights.safetensors").resolve())
