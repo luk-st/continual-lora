@@ -105,8 +105,8 @@ done
 
 for order_seed in "${order_seeds[@]}"; do
     for object_seed in "${object_seeds[@]}"; do
-        log_file="slurm_out/obj_naive_ord${order_seed}_s${object_seed}.log"
-        job_name="obj_naive_ord${order_seed}_s${object_seed}"
+        log_file="slurm_out/obj_orth_ord${order_seed}_s${object_seed}.log"
+        job_name="obj_orth_ord${order_seed}_s${object_seed}"
 
         sbatch --output=$log_file --job-name=$job_name <<EOT
 #!/bin/bash
