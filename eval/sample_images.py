@@ -16,7 +16,7 @@ RESULTS_DIR = "./results"
 
 N_SAMPLES_PER_PROMPT = 5
 BATCH_SIZE = 10
-N_STEPS = 50
+N_STEPS = 30
 GENERATOR_SEED = 42
 
 BASE_VAE_PATH = "madebyollin/sdxl-vae-fp16-fix"
@@ -58,6 +58,8 @@ def get_tasks(file_path):
 
 def get_device():
     distributed_state = PartialState()
+    if distributed_state.is_main_process:
+        print(f"> Multi-GPU state initialized")
     return distributed_state, distributed_state.device
 
 
@@ -85,7 +87,7 @@ def prepare_noise(device, n_prompts):
             dtype=torch.float16,
         )
 
-    return torch.cat([get_noise_per_prompt(device=device) for _ in range(len(n_prompts))])
+    return torch.cat([get_noise_per_prompt(device=device) for _ in range(n_prompts)])
 
 
 def prepare_prompts(prompts_templates, task_token):
@@ -165,7 +167,7 @@ def sample_cl_models(models_path, tasks_configs, method_name, out_path, prompt_t
             task_prompt = task_config["prompt"]
 
             noises = prepare_noise(device, n_prompts=len(prompt_templates))
-            prompts = prepare_prompts(prompt_templates=prompt_templates, task_token=task_prompt)
+            prompts = prepare_prompts(prompts_templates=prompt_templates, task_token=task_prompt)
             outputs = sample_ranked_batched(
                 pipeline=pipe, prompts=prompts, noises=noises, distributed_state=distributed_state, device=device
             )
@@ -177,7 +179,7 @@ def sample_cl_models(models_path, tasks_configs, method_name, out_path, prompt_t
 def make_all_dirs(out_path, n_tasks):
     os.makedirs(out_path, exist_ok=True)
     for task_idx in range(1, n_tasks + 1):
-        os.makedirs(out_path / Path(f"task_{task_idx}"), exist_ok=True)
+        os.makedirs(out_path / Path(f"after_task_{task_idx}"), exist_ok=True)
 
 
 def get_object_metrics(models_path, method_name, task_type):
@@ -186,7 +188,7 @@ def get_object_metrics(models_path, method_name, task_type):
     out_path = (Path(RESULTS_DIR) / Path(f"{task_type}/order_{order_seed}/seed_{seed_seed}")).resolve()
     prompt_templates = get_prompt_templates(task_type=task_type)
 
-    tasks = get_tasks(models_path)
+    tasks = get_tasks(file_path = (Path(models_path) / Path("config.json")).resolve())
     n_tasks = len(tasks)
     make_all_dirs(out_path, n_tasks)
 
