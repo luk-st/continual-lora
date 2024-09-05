@@ -14,9 +14,9 @@ from eval.helpers import save_pickle
 
 RESULTS_DIR = "./results"
 
-N_SAMPLES_PER_PROMPT = 5
-BATCH_SIZE = 10
-N_STEPS = 30
+N_SAMPLES_PER_PROMPT = 8
+BATCH_SIZE = 5
+N_STEPS = 50
 GENERATOR_SEED = 42
 
 BASE_VAE_PATH = "madebyollin/sdxl-vae-fp16-fix"
@@ -110,6 +110,7 @@ def sample_ranked_batched(
     generator = torch.Generator(device=device).manual_seed(GENERATOR_SEED)
     prompt_indices = list(range(len(prompts)))
     with distributed_state.split_between_processes(prompt_indices) as rank_indices:
+        print(f"Split ({distributed_state.process_index}/{distributed_state.num_processes}): {rank_indices}")
         rank_prompt = [prompts[idx] for idx in rank_indices]
         rank_noises = noises[rank_indices]
         outputs = []
@@ -185,7 +186,7 @@ def make_all_dirs(out_path, n_tasks):
 def get_object_metrics(models_path, method_name, task_type):
     order_seed = get_order_seed(models_path)
     seed_seed = get_seed_seed(models_path)
-    out_path = (Path(RESULTS_DIR) / Path(f"{task_type}/order_{order_seed}/seed_{seed_seed}")).resolve()
+    out_path = (Path(RESULTS_DIR) / Path(f"{task_type}/{method_name}/order_{order_seed}/seed_{seed_seed}")).resolve()
     prompt_templates = get_prompt_templates(task_type=task_type)
 
     tasks = get_tasks(file_path = (Path(models_path) / Path("config.json")).resolve())
