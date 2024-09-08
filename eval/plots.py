@@ -20,11 +20,11 @@ def plot_incremental_performance_heatmap(
         linewidths=0.9,
         linecolor="black",
     )
-    plt.title(f"{metric_name} Alignment on next tasks")
+    plt.title(f"Task-incremental {metric_name} Alignment on each task")
     plt.xlabel("Model after task")
     plt.ylabel("Performance on task")
     if name != "":
-        plt.savefig(f"{save_dir}/{name}_{metric_name}.svg")
+        plt.savefig(f"{save_dir}/{name}_{metric_name}_heatmap.svg")
     else:
         plt.show()
 
@@ -49,17 +49,15 @@ def plot_incremental_performance_plot(
         }
     )
     colors = plt.cm.viridis(np.linspace(0, 1, array.shape[1] + 1))
-    markers = ["o", "s", "^", "D", "P", "X", "H"]
     tasks = [f"{idx}" for idx in range(1, array.shape[0]+1)]
 
     plt.figure(figsize=(10, 4))
     for task_finished in range(0, array.shape[1]):
-        y = array[0][task_finished, :]
+        y = array[task_finished, :]
         x = np.arange(y.shape[0])
         plt.plot(
             x,
             y,
-            marker=markers[task_finished],
             color=colors[task_finished],
             linestyle="-",
             linewidth=2,
@@ -68,13 +66,13 @@ def plot_incremental_performance_plot(
         )
 
     plt.title(
-    f"{metric_name} Alignment on each task\nduring each phase of task-incremental training",
+    f"Task-incremental {metric_name} Alignment on each task",
         fontsize=13,
     )
     plt.xlabel("Number of task", fontsize=14, color="gray")
     plt.ylabel(f"{metric_name} Score", fontsize=14, color="gray")
     plt.xticks(
-        ticks=np.arange(1, len(tasks)), labels=tasks[1:], fontsize=12, color="gray"
+        ticks=np.arange(0, len(tasks)), labels=tasks, fontsize=12, color="gray"
     )
     plt.yticks(fontsize=12, color="gray")
     plt.legend(
@@ -87,6 +85,6 @@ def plot_incremental_performance_plot(
     plt.grid(True, linestyle="-", linewidth=0.7, color="white", alpha=0.7)
     plt.tight_layout(rect=[0, 0, 0.85, 1])
     if name != "":
-        plt.savefig(f"{save_dir}/{name}_{metric_name}.svg")
+        plt.savefig(f"{save_dir}/{name}_{metric_name}_plot.svg")
     else:
         plt.show()

@@ -104,7 +104,7 @@ def calculate_cl_metrics(metric_matrix):
     # TODO: check which axis is which
     T = metric_matrix.shape[0]
 
-    final_avg_accuracy = metric_matrix[T - 1, :].mean()
-    final_avg_forgetting = np.mean([metric_matrix[t:, t].max() - metric_matrix[T - 1, t] for t in range(T)])
+    final_avg_accuracy = metric_matrix[:, T - 1].mean()
+    final_avg_forgetting = np.mean([metric_matrix[t, t:].max() - metric_matrix[t, T - 1] for t in range(T)])
 
     return final_avg_accuracy, final_avg_forgetting
