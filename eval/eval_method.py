@@ -37,8 +37,9 @@ def convert_metrics_to_arrays(tasks_metrics_dict, n_tasks: int):
     return metrics_arrays
 
 
-def get_tasks(tasks_config_path):
-    with open(tasks_config_path, "r") as file:
+def get_order_seed_tasks(models_dir, order_seed, training_seed, task_type):
+    config_file_path = Path(models_dir, f"seed_{training_seed}_{task_type}", f"seed_{order_seed}_order", "config.json").resolve()
+    with open(config_file_path, "r") as file:
         tasks_config = json.load(file)
     return tasks_config["tasks"]
 
@@ -98,21 +99,23 @@ def average_metrics(metrics_dict, task_type):
     return output_metrics
 
 
-def get_metrics(models_path, method_name, task_type, tasks_config):
-    tasks = get_tasks(tasks_config)
-    tasks_map = {task["index"]: task for task in tasks}
+def get_metrics(samples_path, method_name, task_type, models_dir):
     metrics_path = (PATH_METRICS_ROOT / task_type / method_name).resolve()
     os.makedirs(metrics_path, exist_ok=True)
 
     metrics_dict = {}
-    orders_paths = find_all_orders_paths(models_path)
+
+    orders_paths = find_all_orders_paths(samples_path)
     for order_path in tqdm(orders_paths, desc="Orders"):
         order_seed = order_path.name.split("order_")[1]
-        seeds_paths = find_all_seeds_paths(order_path)
 
+        seeds_paths = find_all_seeds_paths(order_path)
         for seed_path in tqdm(seeds_paths, desc="Seeds"):
             seed = seed_path.name.split("seed_")[1]
             seeds_results = {}
+
+            tasks = get_order_seed_tasks(models_dir=models_dir, order_seed=order_seed, training_seed=seed, task_type=task_type)
+            tasks_map = {task["index"]: task for task in tasks}
 
             for after_task_model_idx in tqdm(tasks_map.keys(), desc="Models"):
                 after_task_dir = get_after_task_dir(seed_path, after_task_model_idx)
@@ -150,17 +153,17 @@ def get_metrics(models_path, method_name, task_type, tasks_config):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--models_path", type=str, required=True)
+    parser.add_argument("--samples_path", type=str, required=True)
     parser.add_argument(
         "--method_name", type=str, required=True, choices=["mag_max_light", "merge_and_init", "naive_cl", "ortho_init"]
     )
     parser.add_argument("--task_type", type=str, required=True, choices=["object", "style"])
-    parser.add_argument("--tasks_config", type=str, required=True)
+    parser.add_argument("--models_dir", type=str, required=True)
     args = parser.parse_args()
 
     get_metrics(
-        models_path=args.models_path,
+        samples_path=args.samples_path,
         method_name=args.method_name,
         task_type=args.task_type,
-        tasks_config=args.tasks_config,
+        models_dir=args.models_dir,
     )
