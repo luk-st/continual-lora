@@ -1,6 +1,6 @@
 #!/bin/bash
 
-cd_path="<PASS_REPO_PATH>"
+cd_path="./"
 order_seeds=(0 5 10 42)
 style_seeds=(0 5)
 
@@ -11,7 +11,7 @@ for order_seed in "${order_seeds[@]}"; do
 
         sbatch --output=$log_file --job-name=$job_name <<EOT
 #!/bin/bash
-#SBATCH -A plggenerativepw2-gpu-a100
+#SBATCH -A plgdiffusion-gpu-a100
 #SBATCH -p plgrid-gpu-a100
 #SBATCH -t 12:00:00
 #SBATCH --ntasks 1
@@ -25,7 +25,7 @@ module load Miniconda3/23.3.1-0
 
 eval "\$(conda shell.bash hook)"
 
-conda activate lora
+conda activate /net/tscratch/people/plgkzaleska/envs/lora
 
 cd $cd_path
 
@@ -39,12 +39,12 @@ done
 
 for order_seed in "${order_seeds[@]}"; do
     for style_seed in "${style_seeds[@]}"; do
-        log_file="slurm_out/obj_mm_ord${order_seed}_s${style_seed}.log"
-        job_name="obj_mm_ord${order_seed}_s${style_seed}"
+        log_file="slurm_out/style_mai_ord${order_seed}_s${style_seed}.log"
+        job_name="style_mai_ord${order_seed}_s${style_seed}"
 
         sbatch --output=$log_file --job-name=$job_name <<EOT
 #!/bin/bash
-#SBATCH -A plggenerativepw2-gpu-a100
+#SBATCH -A plgdiffusion-gpu-a100
 #SBATCH -p plgrid-gpu-a100
 #SBATCH -t 12:00:00
 #SBATCH --ntasks 1
@@ -58,7 +58,7 @@ module load Miniconda3/23.3.1-0
 
 eval "\$(conda shell.bash hook)"
 
-conda activate lora
+conda activate /net/tscratch/people/plgkzaleska/envs/lora
 
 cd $cd_path
 
@@ -70,68 +70,68 @@ EOT
     done
 done
 
-for order_seed in "${order_seeds[@]}"; do
-    for style_seed in "${style_seeds[@]}"; do
-        log_file="slurm_out/style_naive_ord${order_seed}_s${style_seed}.log"
-        job_name="style_naive_ord${order_seed}_s${style_seed}"
+# for order_seed in "${order_seeds[@]}"; do
+#     for style_seed in "${style_seeds[@]}"; do
+#         log_file="slurm_out/style_naive_ord${order_seed}_s${style_seed}.log"
+#         job_name="style_naive_ord${order_seed}_s${style_seed}"
 
-        sbatch --output=$log_file --job-name=$job_name <<EOT
-#!/bin/bash
-#SBATCH -A plggenerativepw2-gpu-a100
-#SBATCH -p plgrid-gpu-a100
-#SBATCH -t 12:00:00
-#SBATCH --ntasks 1
-#SBATCH --gres gpu:1
-#SBATCH --mem 120G
-#SBATCH --cpus-per-task=16
-#SBATCH --nodes 1
+#         sbatch --output=$log_file --job-name=$job_name <<EOT
+# #!/bin/bash
+# #SBATCH -A plggenerativepw2-gpu-a100
+# #SBATCH -p plgrid-gpu-a100
+# #SBATCH -t 12:00:00
+# #SBATCH --ntasks 1
+# #SBATCH --gres gpu:1
+# #SBATCH --mem 120G
+# #SBATCH --cpus-per-task=16
+# #SBATCH --nodes 1
 
-module load GCC/11.2.0
-module load Miniconda3/23.3.1-0
+# module load GCC/11.2.0
+# module load Miniconda3/23.3.1-0
 
-eval "\$(conda shell.bash hook)"
+# eval "\$(conda shell.bash hook)"
 
-conda activate lora
+# conda activate lora
 
-cd $cd_path
+# cd $cd_path
 
-export PYTHONPATH=\$PWD
+# export PYTHONPATH=\$PWD
 
-python3 scripts_cl/train_style_order.py --order_seed $order_seed --style_seed $style_seed --experiment_name naive_cl
-EOT
+# python3 scripts_cl/train_style_order.py --order_seed $order_seed --style_seed $style_seed --experiment_name naive_cl
+# EOT
 
-    done
-done
+#     done
+# done
 
-for order_seed in "${order_seeds[@]}"; do
-    for style_seed in "${style_seeds[@]}"; do
-        log_file="slurm_out/style_orth_ord${order_seed}_s${style_seed}.log"
-        job_name="style_orth_ord${order_seed}_s${style_seed}"
+# for order_seed in "${order_seeds[@]}"; do
+#     for style_seed in "${style_seeds[@]}"; do
+#         log_file="slurm_out/style_orth_ord${order_seed}_s${style_seed}.log"
+#         job_name="style_orth_ord${order_seed}_s${style_seed}"
 
-        sbatch --output=$log_file --job-name=$job_name <<EOT
-#!/bin/bash
-#SBATCH -A plggenerativepw2-gpu-a100
-#SBATCH -p plgrid-gpu-a100
-#SBATCH -t 12:00:00
-#SBATCH --ntasks 1
-#SBATCH --gres gpu:1
-#SBATCH --mem 120G
-#SBATCH --cpus-per-task=16
-#SBATCH --nodes 1
+#         sbatch --output=$log_file --job-name=$job_name <<EOT
+# #!/bin/bash
+# #SBATCH -A plggenerativepw2-gpu-a100
+# #SBATCH -p plgrid-gpu-a100
+# #SBATCH -t 12:00:00
+# #SBATCH --ntasks 1
+# #SBATCH --gres gpu:1
+# #SBATCH --mem 120G
+# #SBATCH --cpus-per-task=16
+# #SBATCH --nodes 1
 
-module load GCC/11.2.0
-module load Miniconda3/23.3.1-0
+# module load GCC/11.2.0
+# module load Miniconda3/23.3.1-0
 
-eval "\$(conda shell.bash hook)"
+# eval "\$(conda shell.bash hook)"
 
-conda activate lora
+# conda activate lora
 
-cd $cd_path
+# cd $cd_path
 
-export PYTHONPATH=\$PWD
+# export PYTHONPATH=\$PWD
 
-python3 scripts_cl/train_style_order.py --order_seed $order_seed --style_seed $style_seed --experiment_name ortho_init
-EOT
+# python3 scripts_cl/train_style_order.py --order_seed $order_seed --style_seed $style_seed --experiment_name ortho_init
+# EOT
 
-    done
-done
+#     done
+# done

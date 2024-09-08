@@ -165,7 +165,7 @@ def sample_cl_models(models_path, tasks_configs, method_name, out_path, prompt_t
 
         for task_number in tqdm(range(1, model_after_task_idx + 1), "Sampling on tasks"):
             task_config = tasks_map[task_number]
-            task_prompt = task_config["prompt"]
+            task_prompt = task_config["style"]
 
             noises = prepare_noise(device, n_prompts=len(prompt_templates))
             prompts = prepare_prompts(prompts_templates=prompt_templates, task_token=task_prompt)

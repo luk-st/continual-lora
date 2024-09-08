@@ -51,6 +51,7 @@ EOF
     --use_8bit_adam \
     --experiment_name=$EXPERIMENT_NAME \
 
+
   export MODEL_NAME=$OUTPUT_DIR
   wait
 done
