@@ -23,6 +23,19 @@ OBJECT_METRICS = {
 }
 
 
+def reverse_metrics_dict(metrics_dict, task_type):
+    final_metrics_dict = {}
+    metrics_names = STYLE_METRICS if task_type == "style" else OBJECT_METRICS
+
+    for metric_name in metrics_names:
+        metric_dict = {}
+        for order_and_seed, order_and_seed_array in metrics_dict.items():
+            metric_dict[order_and_seed] = order_and_seed_array[metric_name]
+        final_metrics_dict[metric_name] = metric_dict
+
+    return final_metrics_dict
+
+
 def convert_metrics_to_arrays(tasks_metrics_dict, n_tasks: int):
     metrics_arrays = {}
 
@@ -73,16 +86,42 @@ def calculate_metrics(model_samples, eval_path, task_type):
     return {metric_name: metrics_map[metric_name](model_samples, eval_path) for metric_name in metrics_map.keys()}
 
 
-def calc_cl_metrics(metrics_arrays, task_type, save_path):
+def calc_cl_metrics(order_seed_metrics_arrays, task_type, save_path):
     metrics_map = OBJECT_METRICS if task_type == "object" else STYLE_METRICS
 
+    final_scores = {}
     with open(f"{save_path}/out_cl.txt", "w") as file:
         for metric_name in metrics_map.keys():
-            metric_vals = metrics_arrays[metric_name]
-            metric_avg_accuracy, metric_avg_forgetting = calculate_cl_metrics(metric_matrix=metric_vals)
-            output_str = f"{metric_name.upper()} | AVG_ACC={metric_avg_accuracy}\n{metric_name.upper()} AVG_FORGETTING={metric_avg_forgetting}\n"
+            final_scores[metric_name] = {
+                "avg_score": [],
+                "avg_forgetting": [],
+            }
+            for order_and_seed, order_and_seed_array in order_seed_metrics_arrays.items():
+                metric_avg_score, metric_avg_forgetting = calculate_cl_metrics(
+                    metric_matrix=order_and_seed_array[metric_name]
+                )
+
+                output_str = f"{metric_name.upper()} | Order: {order_and_seed[0]} | Seed: {order_and_seed[1]}\n"
+                output_str += f"AVG_SCORE={metric_avg_score} | AVG_FORGETTING={metric_avg_forgetting}\n"
+
+                final_scores[metric_name]["avg_score"].append(metric_avg_score)
+                final_scores[metric_name]["avg_forgetting"].append(metric_avg_forgetting)
+
+                file.write(output_str)
+                print(output_str, end="")
+
+            avg_score_mean = np.mean(final_scores[metric_name]["avg_score"])
+            avg_score_std = np.std(final_scores[metric_name]["avg_score"])
+            avg_forgetting_mean = np.mean(final_scores[metric_name]["avg_forgetting"])
+            avg_forgetting_std = np.std(final_scores[metric_name]["avg_forgetting"])
+
+            output_str = f"{metric_name.upper()} | Averaged results:\n"
+            output_str += f"Mean average score={avg_score_mean} | Std average score={avg_score_std}\n"
+            output_str += (
+                f"Mean average forgetting={avg_forgetting_mean} | Std average forgetting={avg_forgetting_std}\n\n"
+            )
             file.write(output_str)
-            print(output_str)
+            print(output_str, end="")
 
 
 def average_metrics(metrics_dict, task_type):
@@ -156,7 +195,14 @@ def get_metrics(samples_path, method_name, task_type, models_dir):
             name=task_type,
             save_dir=metrics_path,
         )
-    calc_cl_metrics(metrics_arrays, task_type, metrics_path)
+    order_seed_arrays = {
+        order_and_seed: convert_metrics_to_arrays(
+            reverse_metrics_dict(metrics_dict[order_and_seed], task_type), n_tasks
+        )
+        for order_and_seed in metrics_dict.keys()
+    }
+
+    calc_cl_metrics(order_seed_arrays, task_type, metrics_path)
 
 
 if __name__ == "__main__":
