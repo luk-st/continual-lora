@@ -15,9 +15,9 @@ for method_name in "${methods[@]}"; do
 #SBATCH -A plgdiffusion-gpu-a100
 #SBATCH -p plgrid-gpu-a100
 #SBATCH -t 4:30:00
-#SBATCH --ntasks 4
-#SBATCH --gres gpu:4
-#SBATCH --mem 480G
+#SBATCH --ntasks 1
+#SBATCH --gres gpu:1
+#SBATCH --mem 100G
 #SBATCH --cpus-per-task=16
 #SBATCH --nodes 1
 
@@ -27,7 +27,7 @@ conda activate /net/tscratch/people/plgkzaleska/envs/lora
 
 export PYTHONPATH=\$PWD
 
-accelerate launch --num-processes 4 ./eval/sample_images.py --models_path ./models/${method_name}/seed_${style_seed}_style/seed_${order_seed}_order --method_name ${method_name} --task_type style
+accelerate launch --num-processes 1 ./eval/sample_images.py --models_path ./models/${method_name}/seed_${style_seed}_style/seed_${order_seed}_order --method_name ${method_name} --task_type style
 EOT
 
         done
