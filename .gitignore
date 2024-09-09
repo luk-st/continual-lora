@@ -166,3 +166,4 @@ wandb/
 ziplora/wandb/
 results/
 res/
+.vscode/
