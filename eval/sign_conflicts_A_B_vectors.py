@@ -5,32 +5,31 @@ import numpy as np
 import pandas as pd
 import torch
 from diffusers import StableDiffusionXLPipeline
+from pathlib import Path
+import json
 
-STYLE_MODELS = [
-    "watercolor_painting_style_sd1",
-    "oil_painting_style_sd2",
-    "flat_cartoon_illustration_sd3",
-    "abstract_rainbow_colored_flowing_smoke_wave_sd4",
-    "sticker_sd5",
-]
-OBJECT_MODELS = [
-    "wolf_plushie_sd1",
-    "backpack_sd2",
-    "dog6_sd3",
-    "candle_sd4",
-    "cat2_sd5",
-]
-
-SEEDS = [0, 11, 33, 42]
+RESULTS_DIR = "./results-conflicts"
 
 
-def _get_final_results_path(experiment_type):
-    return f"./results/{experiment_type}_sign_conflicts_avaraged"
+def get_tasks(file_path):
+    with open(file_path) as f:
+        file = json.load(f)
+    return file["tasks"]
 
 
-def _get_models(seed, experiment_type):
-    models = STYLE_MODELS if experiment_type == "style" else OBJECT_MODELS
-    return [f"./models/seed_{seed}_{experiment_type}/{model_name}" for model_name in models]
+def get_order_seed(file_path):
+    return int(file_path.split("/")[-1].split("seed_")[1].split("_")[0])
+
+
+def get_seed_seed(file_path):
+    return int(file_path.split("/")[-2].split("seed_")[1].split("_")[0])
+
+
+def _get_models(method_name, task_type, seed, order):
+    models_path = f"./models/{method_name}/seed_{seed}_{task_type}/seed_{order}_order"
+    tasks = get_tasks(file_path = (Path(models_path) / Path("config.json")).resolve())
+    n_tasks = len(tasks)
+    return [f"{models_path}/{i}" for i in range(0, n_tasks)]
 
 
 def _get_subtract_models(models_to_subtract):
@@ -110,57 +109,66 @@ def calculate_sign_conflicts(model_A, model_to_subtract, models_to_compare):
     return sign_conflicts_dict, sign_conflicts_dict_norm
 
 
-def main(experiment_type=True):
-    res_path = _get_final_results_path(experiment_type)
-    os.makedirs(res_path, exist_ok=True)
+def main(models_path, task_type, method_name):
+    seed_seed = get_seed_seed(models_path)
+    order_seed = get_order_seed(models_path)
 
-    model_names = STYLE_MODELS if experiment_type == "style" else OBJECT_MODELS
+    out_path = (Path(RESULTS_DIR) / Path(f"{task_type}/{method_name}/order_{order_seed}/seed_{seed_seed}")).resolve()
+    os.makedirs(out_path, exist_ok=True)
+
+    model_names = get_tasks(file_path = (Path(models_path) / Path("config.json")).resolve())
+    model_names = [str(i) for i in range(0, len(model_names))]
     final_df = pd.DataFrame(index=model_names, columns=model_names)
     final_df_norm = pd.DataFrame(index=model_names, columns=model_names)
 
-    for seed in SEEDS:
-        models = _get_models(seed, experiment_type)
-        models_to_subtract = _get_subtract_models(models)
+    print(final_df)
 
-        print(f"Seed: {seed}")
-        print(f"Models: {models}")
-        print(f"Models to subtract: {models_to_subtract}")
+    models = _get_models(method_name, task_type, seed_seed, order_seed)
+    models_to_subtract = _get_subtract_models(models)
 
-        for idx, (main_model, model_to_subtract) in enumerate(
-            zip(models[:-1], models_to_subtract)
-        ):
-            print(
-                f"Calculating sign conflicts: \n\tMain model: {main_model}\n\tModel to subtract: {model_to_subtract}\n\tModels to compare: {models[idx+1:]}"
-            )
+    print(f"Seed: {seed_seed}")
+    print(f"Models: {models}")
+    print(f"Models to subtract: {models_to_subtract}")
 
-            model_A = StableDiffusionXLPipeline.from_pretrained(
-                main_model, torch_dtype=torch.float16
-            )
-            model_to_subtract = StableDiffusionXLPipeline.from_pretrained(
-                model_to_subtract, torch_dtype=torch.float16
-            )
+    for idx, (main_model, model_to_subtract) in enumerate(
+        zip(models[:-1], models_to_subtract)
+    ):
+        print(
+            f"Calculating sign conflicts: \n\tMain model: {main_model}\n\tModel to subtract: {model_to_subtract}\n\tModels to compare: {models[idx+1:]}"
+        )
 
-            sign_conflicts_dict, sign_conflicts_dict_norm = calculate_sign_conflicts(
-                model_A, model_to_subtract, models[idx + 1 :]
-            )
+        model_A = StableDiffusionXLPipeline.from_pretrained(
+            main_model, torch_dtype=torch.float16
+        )
+        model_to_subtract = StableDiffusionXLPipeline.from_pretrained(
+            model_to_subtract, torch_dtype=torch.float16
+        )
 
-            update_final_df(final_df, sign_conflicts_dict, main_model)
-            update_final_df(final_df_norm, sign_conflicts_dict_norm, main_model)
+        sign_conflicts_dict, sign_conflicts_dict_norm = calculate_sign_conflicts(
+            model_A, model_to_subtract, models[idx + 1 :]
+        )
 
-            del model_A
+        update_final_df(final_df, sign_conflicts_dict, main_model)
+        update_final_df(final_df_norm, sign_conflicts_dict_norm, main_model)
 
-    final_df /= len(SEEDS)
-    final_df_norm /= len(SEEDS)
+        del model_A
 
-    final_df.to_csv(os.path.join(res_path, f"sign_conflicts_avg.csv"))
-    final_df_norm.to_csv(os.path.join(res_path, f"sign_conflicts_avg_norm.csv"))
+    final_df = final_df / 1
+    final_df_norm = final_df_norm / 1
+
+    final_df.to_csv(os.path.join(out_path, f"sign_conflicts_avg.csv"))
+    final_df_norm.to_csv(os.path.join(out_path, f"sign_conflicts_avg_norm.csv"))
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument("--models_path", type=str, required=True)
     parser.add_argument(
-        "--experiment_type", choices=["style", "object"], required=True, type=str, help="Type of experiment"
+        "--method_name", type=str, required=True, choices=["mag_max_light", "merge_and_init", "naive_cl", "ortho_init"]
+    )
+    parser.add_argument(
+        "--task_type", choices=["style", "object"], required=True, type=str, help="Type of experiment"
     )
     args = parser.parse_args()
 
-    main(experiment_type=args.experiment_type)
+    main(task_type=args.task_type, models_path=args.models_path, method_name=args.method_name)
