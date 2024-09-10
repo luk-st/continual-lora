@@ -800,7 +800,7 @@ def parse_args(input_args=None):
 
     return args
 
-def init_lora_with_checkpoint(unet, lora_path, accelerator, verify: bool=True):
+def init_lora_with_checkpoint(unet, lora_path, accelerator, verify: bool=True, name:str="default"):
     if verify:
         unet_lora_params_before = {p_n: p.clone().cpu() for (p_n, p) in unet.named_parameters() if p.requires_grad}
 
@@ -810,7 +810,7 @@ def init_lora_with_checkpoint(unet, lora_path, accelerator, verify: bool=True):
     }
     prev_lora_state_dict = convert_unet_state_dict_to_peft(prev_lora_state_dict)
     prev_lora_state_dict = {
-        re.sub(".weight", ".default.weight", p): w for (p,w) in prev_lora_state_dict.items()
+        re.sub(".weight", f".{name}.weight", p): w for (p,w) in prev_lora_state_dict.items()
     }
     for name, param in unet.named_parameters():
         if name in prev_lora_state_dict and param.requires_grad:
@@ -825,7 +825,7 @@ def init_lora_with_checkpoint(unet, lora_path, accelerator, verify: bool=True):
             assert torch.equal(unet_lora_params_after[k_to_check], prev_lora_state_dict[k_to_check])
     return unet
 
-def init_lora_with_checkpoint_rotate(unet, lora_path, accelerator, verify: bool=True):
+def init_lora_with_checkpoint_rotate(unet, lora_path, accelerator, verify: bool=True, name:str="default"):
 
     @torch.no_grad()
     def find_orthogonal_vector_svd(v):
@@ -853,13 +853,15 @@ def init_lora_with_checkpoint_rotate(unet, lora_path, accelerator, verify: bool=
     }
     prev_lora_state_dict = convert_unet_state_dict_to_peft(prev_lora_state_dict)
     prev_lora_state_dict = {
-        re.sub(".weight", ".default.weight", p): w for (p,w) in prev_lora_state_dict.items()
+        re.sub(".weight", f".{name}.weight", p): w for (p,w) in prev_lora_state_dict.items()
     }
     prev_lora_state_dict_A = {
         p: w for (p,w) in prev_lora_state_dict.items() if "lora_A" in p
     }
 
-    for name, param in tqdm(unet.named_parameters(), desc="LoRA A orthogonalization with rotation"):
+    n_parameters = len([x for x in unet.named_parameters()])
+
+    for name, param in tqdm(unet.named_parameters(), total=n_parameters, desc="LoRA A orthogonalization with rotation"):
         if name in prev_lora_state_dict and param.requires_grad:
             if "lora_A" in name:        # we only orthogonalize A matrices
                 with torch.no_grad():
@@ -1390,7 +1392,6 @@ def main(args):
         )
 
     # Move unet, vae and text_encoder to device and cast to weight_dtype
-    unet.to(accelerator.device, dtype=weight_dtype)
 
     # The VAE is always in float32 to avoid NaN losses.
     vae.to(accelerator.device, dtype=torch.float32)
@@ -1421,13 +1422,30 @@ def main(args):
             text_encoder_two.gradient_checkpointing_enable()
 
     # now we will add new LoRA weights to the attention layers
+    if args.experiment_name in ["ortho_init"]:
+        if args.lora_path is None or args.lora_path == "":
+            pass
+        else:
+            unet_lora_config = LoraConfig(
+                r=args.rank,
+            lora_alpha=args.rank,
+            init_lora_weights="gaussian",
+                target_modules=["to_k", "to_q", "to_v", "to_out.0"],
+            )
+            unet.add_adapter(unet_lora_config, adapter_name="continual")
+            unet = init_lora_with_checkpoint(unet=unet, lora_path=args.lora_path, accelerator=accelerator, verify=True, name="continual")
+            unet.fuse_lora()
+            unet.delete_adapters(adapter_names=["continual"])
+            unet.requires_grad_(False)
+    unet.to(accelerator.device, dtype=weight_dtype)
+
     unet_lora_config = LoraConfig(
         r=args.rank,
         lora_alpha=args.rank,
         init_lora_weights="gaussian",
         target_modules=["to_k", "to_q", "to_v", "to_out.0"],
     )
-    unet.add_adapter(unet_lora_config)
+    unet.add_adapter(unet_lora_config, adapter_name="default")
 
     if args.experiment_name in ["naive_cl"]:
         if args.lora_path is None or args.lora_path == "":
@@ -1439,7 +1457,7 @@ def main(args):
         if args.lora_path is None or args.lora_path == "":
             pass
         else:
-            unet = init_lora_with_checkpoint_rotate(unet=unet, lora_path=args.lora_path, accelerator=accelerator)
+            unet = init_lora_with_checkpoint_rotate(unet=unet, lora_path=args.lora_path, accelerator=accelerator, verify=True, name="default")
 
     # The text encoder comes from 🤗 transformers, so we cannot directly modify it.
     # So, instead, we monkey-patch the forward calls of its attention-blocks.
@@ -1495,6 +1513,7 @@ def main(args):
                 unet_lora_layers=unet_lora_layers_to_save,
                 text_encoder_lora_layers=text_encoder_one_lora_layers_to_save,
                 text_encoder_2_lora_layers=text_encoder_two_lora_layers_to_save,
+                weight_name="default"
             )
 
     def load_model_hook(models, input_dir):
@@ -2350,7 +2369,34 @@ def main(args):
             # just don't remove LoRA weights
             pass
 
-        elif args.experiment_name in ["merge_and_init", "mag_max_light", "ortho_init"]:
+        elif args.experiment_name in ["ortho_init"]:
+            if args.lora_path is not None and args.lora_path != "":
+                pipeline = StableDiffusionXLPipeline.from_pretrained(
+                    args.pretrained_model_name_or_path,
+                    vae=vae,
+                    revision=args.revision,
+                    variant=args.variant,
+                    torch_dtype=weight_dtype,
+                )
+                pipeline.load_lora_weights(args.output_dir, name="current")
+                pipeline.load_lora_weights(args.lora_path, name="continual")
+                pipeline.add_weighted_adapter(
+                    adapters=["current", "continual"],
+                    weights=[1.0, 1.0],
+                    adapter_name="default",
+                    combination_type="linear",
+                )
+                pipeline.set_adapters("default")
+                pipeline.delete_adapters(["current", "continual"])
+                unet_lora_layers = convert_state_dict_to_diffusers(
+                    get_peft_model_state_dict(pipeline.unet, adapter_name="default")
+                )
+                StableDiffusionXLPipeline.save_lora_weights(
+                    save_directory=args.output_dir,
+                    unet_lora_layers=unet_lora_layers,
+                )
+
+        elif args.experiment_name in ["merge_and_init", "mag_max_light"]:
             # we merge LoRAs to U-Net
             pipeline.fuse_lora(fuse_unet=True)
             pipeline.unload_lora_weights()
