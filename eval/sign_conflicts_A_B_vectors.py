@@ -4,11 +4,33 @@ import os
 import numpy as np
 import pandas as pd
 import torch
-from diffusers import StableDiffusionXLPipeline
+from diffusers import AutoencoderKL, StableDiffusionXLPipeline
 from pathlib import Path
 import json
 
 RESULTS_DIR = "./results-conflicts"
+
+BASE_VAE_PATH = "madebyollin/sdxl-vae-fp16-fix"
+BASE_SDXL_PATH = "stabilityai/stable-diffusion-xl-base-1.0"
+
+def load_pipe_from_model_task(model_path, method_name, device):
+    if model_path == "stabilityai/stable-diffusion-xl-base-1.0":
+        pipeline = StableDiffusionXLPipeline.from_pretrained(model_path, torch_dtype=torch.float16)
+
+    elif method_name in ["merge_and_init", "ortho_init", "mag_max_light"]:
+        vae = AutoencoderKL.from_pretrained(model_path, subfolder="vae", torch_dtype=torch.float16)
+        pipeline = StableDiffusionXLPipeline.from_pretrained(model_path, vae=vae, torch_dtype=torch.float16)
+
+    elif method_name in ["naive_cl"]:
+        vae = AutoencoderKL.from_pretrained(BASE_VAE_PATH, torch_dtype=torch.float16)
+        pipeline = StableDiffusionXLPipeline.from_pretrained(BASE_SDXL_PATH, vae=vae, torch_dtype=torch.float16)
+        pipeline.load_lora_weights(model_path)
+        pipeline.fuse_lora(fuse_unet=True)
+        pipeline.unload_lora_weights()
+
+    pipeline = pipeline.to(device)
+    return pipeline
+
 
 
 def get_tasks(file_path):
@@ -29,7 +51,8 @@ def _get_models(method_name, task_type, seed, order):
     models_path = f"./models/{method_name}/seed_{seed}_{task_type}/seed_{order}_order"
     tasks = get_tasks(file_path = (Path(models_path) / Path("config.json")).resolve())
     n_tasks = len(tasks)
-    return [f"{models_path}/{i}" for i in range(0, n_tasks)]
+    # TODO: as always problem with style
+    return [f"{models_path}/{i}" for i in range(1, n_tasks + 1)]
 
 
 def _get_subtract_models(models_to_subtract):
@@ -71,14 +94,15 @@ def update_final_df(df, sign_conflicts_dict, main_model):
         )
 
 
-def calculate_sign_conflicts(model_A, model_to_subtract, models_to_compare):
+def calculate_sign_conflicts(model_A, model_to_subtract, models_to_compare, method_name):
     vector_A = get_vector_differs(model_A, model_to_subtract)
     sign_conflicts_dict_norm, sign_conflicts_dict = {}, {}
 
     for model_B_path in models_to_compare:
-        model_B = StableDiffusionXLPipeline.from_pretrained(
-            model_B_path, torch_dtype=torch.float16
-        )
+        # model_B = StableDiffusionXLPipeline.from_pretrained(
+        #     model_B_path, torch_dtype=torch.float16
+        # )
+        model_B = load_pipe_from_model_task(model_B_path, method_name, "cuda")
         vector_B = get_vector_differs(model_B, model_to_subtract)
 
         # calculate using number of sign conflicts
@@ -117,7 +141,8 @@ def main(models_path, task_type, method_name):
     os.makedirs(out_path, exist_ok=True)
 
     model_names = get_tasks(file_path = (Path(models_path) / Path("config.json")).resolve())
-    model_names = [str(i) for i in range(0, len(model_names))]
+    # TODO: as always problem with style
+    model_names = [str(i) for i in range(1, len(model_names) + 1)]
     final_df = pd.DataFrame(index=model_names, columns=model_names)
     final_df_norm = pd.DataFrame(index=model_names, columns=model_names)
 
@@ -137,15 +162,17 @@ def main(models_path, task_type, method_name):
             f"Calculating sign conflicts: \n\tMain model: {main_model}\n\tModel to subtract: {model_to_subtract}\n\tModels to compare: {models[idx+1:]}"
         )
 
-        model_A = StableDiffusionXLPipeline.from_pretrained(
-            main_model, torch_dtype=torch.float16
-        )
-        model_to_subtract = StableDiffusionXLPipeline.from_pretrained(
-            model_to_subtract, torch_dtype=torch.float16
-        )
+        # model_A = StableDiffusionXLPipeline.from_pretrained(
+        #     main_model, torch_dtype=torch.float16
+        # )
+        model_A = load_pipe_from_model_task(main_model, method_name, "cuda")
+        # model_to_subtract = StableDiffusionXLPipeline.from_pretrained(
+        #     model_to_subtract, torch_dtype=torch.float16
+        # )
+        model_to_subtract = load_pipe_from_model_task(model_to_subtract, method_name, "cuda")
 
         sign_conflicts_dict, sign_conflicts_dict_norm = calculate_sign_conflicts(
-            model_A, model_to_subtract, models[idx + 1 :]
+            model_A, model_to_subtract, models[idx + 1 :], method_name
         )
 
         update_final_df(final_df, sign_conflicts_dict, main_model)
@@ -153,8 +180,8 @@ def main(models_path, task_type, method_name):
 
         del model_A
 
-    final_df = final_df / 1
-    final_df_norm = final_df_norm / 1
+    # final_df = final_df / 1
+    # final_df_norm = final_df_norm / 1
 
     final_df.to_csv(os.path.join(out_path, f"sign_conflicts_avg.csv"))
     final_df_norm.to_csv(os.path.join(out_path, f"sign_conflicts_avg_norm.csv"))
