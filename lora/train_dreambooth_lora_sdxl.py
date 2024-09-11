@@ -93,6 +93,17 @@ def determine_scheduler_type(pretrained_model_name_or_path, revision):
     return scheduler_type
 
 
+def merge_loras(lora_weights_1, lora_weights_2, weights = [1.0, 1.0]):
+    merged_lora = {}
+    for key in lora_weights_1.keys():
+        assert key in lora_weights_2, f"Key {key} not found in second lora weights"
+    for key in lora_weights_2.keys():
+        assert key in lora_weights_1, f"Key {key} not found in first lora weights"
+
+    for key in lora_weights_1.keys():
+        merged_lora[key] = weights[0] * lora_weights_1[key] + weights[1] * lora_weights_2[key]
+    return merged_lora
+
 def save_model_card(
     repo_id: str,
     use_dora: bool,
@@ -2371,30 +2382,13 @@ def main(args):
 
         elif args.experiment_name in ["ortho_init"]:
             if args.lora_path is not None and args.lora_path != "":
-                pipeline = StableDiffusionXLPipeline.from_pretrained(
-                    args.pretrained_model_name_or_path,
-                    vae=vae,
-                    revision=args.revision,
-                    variant=args.variant,
-                    torch_dtype=weight_dtype,
-                )
-                pipeline.load_lora_weights(args.output_dir, name="current")
-                pipeline.load_lora_weights(args.lora_path, name="continual")
-                pipeline.add_weighted_adapter(
-                    adapters=["current", "continual"],
-                    weights=[1.0, 1.0],
-                    adapter_name="default",
-                    combination_type="linear",
-                )
-                pipeline.set_adapters("default")
-                pipeline.delete_adapters(["current", "continual"])
-                unet_lora_layers = convert_state_dict_to_diffusers(
-                    get_peft_model_state_dict(pipeline.unet, adapter_name="default")
-                )
-                StableDiffusionXLPipeline.save_lora_weights(
-                    save_directory=args.output_dir,
-                    unet_lora_layers=unet_lora_layers,
-                )
+                lora_continual_path = (Path(args.lora_path)/"pytorch_lora_weights.safetensors").resolve()
+                lora_current_path = (Path(args.output_dir)/"pytorch_lora_weights.safetensors").resolve()
+                lora_continual_tasks = load_file(lora_continual_path)
+                lora_current_task = load_file(lora_current_path)
+
+                merged_lora_weights = merge_loras(lora_current_task, lora_continual_tasks)
+                save_file(merged_lora_weights, lora_current_path)
 
         elif args.experiment_name in ["merge_and_init", "mag_max_light"]:
             # we merge LoRAs to U-Net
