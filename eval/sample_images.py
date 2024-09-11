@@ -142,7 +142,7 @@ def sample_ranked_batched(
     return all_outputs
 
 
-def sample_cl_models(models_path, tasks_configs, method_name, out_path, prompt_templates):
+def sample_cl_models(models_path, tasks_configs, method_name, out_path, prompt_templates, task_type):
     distributed_state, device = get_device()
     if distributed_state.is_main_process:
         print(f"> Starting: sampling")
@@ -165,7 +165,7 @@ def sample_cl_models(models_path, tasks_configs, method_name, out_path, prompt_t
 
         for task_number in tqdm(range(1, model_after_task_idx + 1), "Sampling on tasks"):
             task_config = tasks_map[task_number]
-            task_prompt = task_config["prompt"]
+            task_prompt = task_config["prompt"] if task_type == "object" else task_config["style"]
 
             noises = prepare_noise(device, n_prompts=len(prompt_templates))
             prompts = prepare_prompts(prompts_templates=prompt_templates, task_token=task_prompt)
@@ -199,6 +199,7 @@ def get_object_metrics(models_path, method_name, task_type):
         method_name=method_name,
         out_path=out_path,
         prompt_templates=prompt_templates,
+        task_type=task_type,
     )
 
 
@@ -206,7 +207,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--models_path", type=str, required=True)
     parser.add_argument(
-        "--method_name", type=str, required=True, choices=["mag_max_light", "merge_and_init", "naive_cl", "ortho_init"]
+        "--method_name", type=str, required=True, choices=["mag_max_light", "merge_and_init", "naive_cl", "ortho_init", "base"]
     )
     parser.add_argument("--task_type", type=str, required=True, choices=["object", "style"])
     args = parser.parse_args()
