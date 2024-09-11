@@ -55,7 +55,6 @@ EOF
     --lora_path=$LORA_MODEL_NAME
 
   export LORA_MODEL_NAME=$OUTPUT_DIR
-  export BASE_MODEL_NAME=$OUTPUT_DIR
   wait
 done
 
