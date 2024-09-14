@@ -7,7 +7,19 @@ def plot_incremental_performance_heatmap(
 ):
     tasks_x = [f"{idx}" for idx in range(1, array.shape[0]+1)]
     tasks_y = [f"{idx}" for idx in range(1, array.shape[1]+1)]
-    colormap = "YlOrRd"
+    colormap = "Greens"
+
+    plt.rcParams.update(
+        {
+            "axes.facecolor": "#f0f0f0",
+            "figure.facecolor": "#ffffff",
+            "axes.edgecolor": "gray",
+            "axes.linewidth": 1.0,
+            "axes.labelcolor": "gray",
+            "xtick.color": "gray",
+            "ytick.color": "gray",
+        }
+    )
 
     plt.figure(figsize=(8, 4))
     sns.heatmap(
@@ -17,14 +29,22 @@ def plot_incremental_performance_heatmap(
         cmap=colormap,
         xticklabels=tasks_x,
         yticklabels=tasks_y,
-        linewidths=0.9,
+        linewidths=0.5,
         linecolor="black",
+        # vmin=0.2 if metric_name == "CSD" else 0.15, 
+        # vmax=0.65 if metric_name == "CSD" else 0.5,
+        # cbar_kws={"ticks": [0.3, 0.4, 0.5, 0.6] if metric_name == "CSD" else [0.2, 0.3, 0.4], "alpha": 1.0, "shrink": 0.9},
+        annot_kws={"size": 13},
     )
-    plt.title(f"Task-incremental {metric_name} Alignment on each task")
-    plt.xlabel("Model after task")
-    plt.ylabel("Performance on task")
+
+    # plt.title(f"Task-incremental {metric_name} Alignment on each task")
+    plt.xlabel("Model after task", fontsize=20)
+    plt.ylabel("Performance on task", fontsize=20)
+    plt.xticks(fontsize=15)
+    plt.yticks(fontsize=15, rotation=0)
+    plt.tight_layout(rect=[0, 0, 1, 1])
     if name != "":
-        plt.savefig(f"{save_dir}/{name}_{metric_name}_heatmap.svg")
+        plt.savefig(f"{save_dir}/{name}_{metric_name}_heatmap.pdf")
     else:
         plt.show()
 

@@ -74,12 +74,11 @@ def get_device():
 
 
 def load_pipe_from_model_task(model_path, method_name, device):
-    if method_name in ["merge_and_init", "mag_max_light"]:
+    if method_name in ["merge_and_init", "mag_max_light", "ortho_init"]:
         vae = AutoencoderKL.from_pretrained(BASE_VAE_PATH, torch_dtype=torch.float16)
-        # vae = AutoencoderKL.from_pretrained(model_path, subfolder="vae", torch_dtype=torch.float16)
         pipeline = StableDiffusionXLPipeline.from_pretrained(model_path, vae=vae, torch_dtype=torch.float16)
 
-    elif method_name in ["naive_cl", "ortho_init"]:
+    elif method_name in ["naive_cl"]:
         vae = AutoencoderKL.from_pretrained(BASE_VAE_PATH, torch_dtype=torch.float16)
         pipeline = StableDiffusionXLPipeline.from_pretrained(BASE_SDXL_PATH, vae=vae, torch_dtype=torch.float16)
         pipeline.load_lora_weights(model_path)
@@ -121,11 +120,13 @@ def sample_ranked_batched(
     device: torch.device,
     num_inference_steps=N_STEPS,
     batch_size=BATCH_SIZE,
+    print_accelerate_status=False,
 ):
     generator = torch.Generator(device=device).manual_seed(GENERATOR_SEED)
     prompt_indices = list(range(len(prompts)))
     with distributed_state.split_between_processes(prompt_indices) as rank_indices:
-        print(f"Split ({distributed_state.process_index}/{distributed_state.num_processes}): {rank_indices}")
+        if print_accelerate_status:
+            print(f"Split ({distributed_state.process_index}/{distributed_state.num_processes}): {rank_indices}")
         rank_prompt = [prompts[idx] for idx in rank_indices]
         rank_noises = noises[rank_indices]
         outputs = []
@@ -161,6 +162,7 @@ def sample_cl_models(models_path, tasks_configs, method_name, out_path, prompt_t
     distributed_state, device = get_device()
     if distributed_state.is_main_process:
         print(f"> Starting: sampling")
+    print_accelerate_status = True
 
     if method_name == "base":
         models_after_tasks = [list(tasks_configs.values())[sorted(list(tasks_configs.keys()))[-1] - 1]]
@@ -188,8 +190,14 @@ def sample_cl_models(models_path, tasks_configs, method_name, out_path, prompt_t
             noises = prepare_noise(device, n_prompts=len(prompt_templates))
             prompts = prepare_prompts(prompts_templates=prompt_templates, task_token=task_prompt)
             outputs = sample_ranked_batched(
-                pipeline=pipe, prompts=prompts, noises=noises, distributed_state=distributed_state, device=device
+                pipeline=pipe,
+                prompts=prompts,
+                noises=noises,
+                distributed_state=distributed_state,
+                device=device,
+                print_accelerate_status=print_accelerate_status,
             )
+            print_accelerate_status = False
 
             task_out_path = out_path_after_task
             save_pickle({"prompts": prompts, "samples": outputs}, task_out_path / Path(f"on_task_{task_number}.pkl"))
