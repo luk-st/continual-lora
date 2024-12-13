@@ -21,6 +21,7 @@ import logging
 import math
 import os
 import random
+import re
 import shutil
 import warnings
 from contextlib import nullcontext
@@ -34,36 +35,23 @@ import torch.utils.checkpoint
 import transformers
 from accelerate import Accelerator
 from accelerate.logging import get_logger
-from accelerate.utils import (
-    DistributedDataParallelKwargs,
-    ProjectConfiguration,
-    set_seed,
-)
-from diffusers import (
-    AutoencoderKL,
-    DDPMScheduler,
-    DPMSolverMultistepScheduler,
-    EDMEulerScheduler,
-    EulerDiscreteScheduler,
-    StableDiffusionXLPipeline,
-    UNet2DConditionModel,
-)
+from accelerate.utils import (DistributedDataParallelKwargs,
+                              ProjectConfiguration, set_seed)
+from diffusers import (AutoencoderKL, DDPMScheduler,
+                       DPMSolverMultistepScheduler, EDMEulerScheduler,
+                       EulerDiscreteScheduler, StableDiffusionXLPipeline,
+                       UNet2DConditionModel)
 from diffusers.loaders import LoraLoaderMixin
 from diffusers.optimization import get_scheduler
-from diffusers.training_utils import (
-    _set_state_dict_into_text_encoder,
-    cast_training_params,
-    compute_snr,
-)
-from diffusers.utils import (
-    check_min_version,
-    convert_all_state_dict_to_peft,
-    convert_state_dict_to_diffusers,
-    convert_state_dict_to_kohya,
-    convert_unet_state_dict_to_peft,
-    is_wandb_available,
-)
-from diffusers.utils.hub_utils import load_or_create_model_card, populate_model_card
+from diffusers.training_utils import (_set_state_dict_into_text_encoder,
+                                      cast_training_params, compute_snr)
+from diffusers.utils import (check_min_version, convert_all_state_dict_to_peft,
+                             convert_state_dict_to_diffusers,
+                             convert_state_dict_to_kohya,
+                             convert_unet_state_dict_to_peft,
+                             is_wandb_available)
+from diffusers.utils.hub_utils import (load_or_create_model_card,
+                                       populate_model_card)
 from diffusers.utils.import_utils import is_xformers_available
 from diffusers.utils.torch_utils import is_compiled_module
 from huggingface_hub import create_repo, hf_hub_download, upload_folder
@@ -104,6 +92,17 @@ def determine_scheduler_type(pretrained_model_name_or_path, revision):
         scheduler_type = json.load(f)["scheduler"][1]
     return scheduler_type
 
+
+def merge_loras(lora_weights_1, lora_weights_2, weights = [1.0, 1.0]):
+    merged_lora = {}
+    for key in lora_weights_1.keys():
+        assert key in lora_weights_2, f"Key {key} not found in second lora weights"
+    for key in lora_weights_2.keys():
+        assert key in lora_weights_1, f"Key {key} not found in first lora weights"
+
+    for key in lora_weights_1.keys():
+        merged_lora[key] = weights[0] * lora_weights_1[key] + weights[1] * lora_weights_2[key]
+    return merged_lora
 
 def save_model_card(
     repo_id: str,
@@ -761,15 +760,20 @@ def parse_args(input_args=None):
         "--experiment_name",
         type=str,
         required=True,
-        default="merge_and_init",
         help="Name of the experiment",
-        choices=["merge_and_init", "mag_max_light"],
+        choices=["merge_and_init", "mag_max_light", "naive_cl", "ortho_init"],
     )
     parser.add_argument(
         "--save_mag_max",
         action="store_true",
         default=False,
         help=("If True then save the model after selecting the maximum value between the current task vector and the previous tasks vector.")
+    )
+    parser.add_argument(
+        "--lora_path",
+        type=str,
+        default=None,
+        help="Path to the LoRA checkpoint to initialize the model with."
     )
 
     if input_args is not None:
@@ -807,6 +811,86 @@ def parse_args(input_args=None):
 
     return args
 
+def init_lora_with_checkpoint(unet, lora_path, accelerator, verify: bool=True, name:str="default"):
+    if verify:
+        unet_lora_params_before = {p_n: p.clone().cpu() for (p_n, p) in unet.named_parameters() if p.requires_grad}
+
+    prev_lora_state_dict, _ = LoraLoaderMixin.lora_state_dict(lora_path)
+    prev_lora_state_dict = {
+        f'{k.replace("unet.", "")}': v for k, v in prev_lora_state_dict.items() if k.startswith("unet.")
+    }
+    prev_lora_state_dict = convert_unet_state_dict_to_peft(prev_lora_state_dict)
+    prev_lora_state_dict = {
+        re.sub(".weight", f".{name}.weight", p): w for (p,w) in prev_lora_state_dict.items()
+    }
+    for name, param in unet.named_parameters():
+        if name in prev_lora_state_dict and param.requires_grad:
+            with torch.no_grad():
+                param.copy_(prev_lora_state_dict[name].to(accelerator.device))
+
+    if verify:
+        unet_lora_params_after = {p_n: p.clone().cpu() for (p_n,p) in unet.named_parameters() if p.requires_grad}
+        for k_to_check in tqdm(list(unet_lora_params_after), desc="Verifying loading LoRAs 1/2"):
+            assert not torch.equal(unet_lora_params_after[k_to_check], unet_lora_params_before[k_to_check])
+        for k_to_check in tqdm(list(unet_lora_params_after), desc="Verifying loading LoRAs 2/2"):
+            assert torch.equal(unet_lora_params_after[k_to_check], prev_lora_state_dict[k_to_check])
+    return unet
+
+def init_lora_with_checkpoint_rotate(unet, lora_path, accelerator, verify: bool=True, name:str="default"):
+
+    @torch.no_grad()
+    def find_orthogonal_vector_svd(v):
+        # use SVD to obtain orthogonalized vector during initialization
+        assert len(v.shape) == 1
+        v = v.view(1, -1)
+        _, _, vh = torch.linalg.svd(v)
+        ortho_vec = vh[-1, :]
+        return ortho_vec
+
+    @torch.no_grad()
+    def get_matrix_ortho_columns(matrix):
+        assert len(matrix.shape) == 2
+        return torch.stack([
+            find_orthogonal_vector_svd(matrix[:, idx]) for idx in range(matrix.shape[1])
+        ]).T
+
+    if verify:
+        unet_lora_params_before_A = {p_n: p.clone().cpu() for (p_n, p) in unet.named_parameters() if p.requires_grad and "lora_A" in p_n}
+        unet_lora_params_before_B = {p_n: p.clone().cpu() for (p_n, p) in unet.named_parameters() if p.requires_grad and "lora_B" in p_n}
+
+    prev_lora_state_dict, _ = LoraLoaderMixin.lora_state_dict(lora_path)
+    prev_lora_state_dict = {
+        f'{k.replace("unet.", "")}': v for k, v in prev_lora_state_dict.items() if k.startswith("unet.")
+    }
+    prev_lora_state_dict = convert_unet_state_dict_to_peft(prev_lora_state_dict)
+    prev_lora_state_dict = {
+        re.sub(".weight", f".{name}.weight", p): w for (p,w) in prev_lora_state_dict.items()
+    }
+    prev_lora_state_dict_A = {
+        p: w for (p,w) in prev_lora_state_dict.items() if "lora_A" in p
+    }
+
+    n_parameters = len([x for x in unet.named_parameters()])
+
+    for name, param in tqdm(unet.named_parameters(), total=n_parameters, desc="LoRA A orthogonalization with rotation"):
+        if name in prev_lora_state_dict and param.requires_grad:
+            if "lora_A" in name:        # we only orthogonalize A matrices
+                with torch.no_grad():
+                    param.copy_(get_matrix_ortho_columns(prev_lora_state_dict[name]).to(accelerator.device))
+
+    if verify:
+        unet_lora_params_after_A = {p_n: p.clone().cpu() for (p_n,p) in unet.named_parameters() if p.requires_grad and "lora_A" in p_n}
+        unet_lora_params_after_B = {p_n: p.clone().cpu() for (p_n,p) in unet.named_parameters() if p.requires_grad and "lora_B" in p_n}
+
+        for k_to_check in tqdm(list(unet_lora_params_after_A), desc="Verifying loading LoRAs 1/2 (A)"):
+            assert not torch.equal(unet_lora_params_after_A[k_to_check], unet_lora_params_before_A[k_to_check])
+            for idx in range(unet_lora_params_after_A[k_to_check].shape[1]):
+                assert F.cosine_similarity(unet_lora_params_after_A[k_to_check][:,idx:idx+1].T, prev_lora_state_dict_A[k_to_check][:,idx:idx+1].T).item() < 0.0001
+
+        for k_to_check in tqdm(list(unet_lora_params_after_B), desc="Verifying loading LoRAs 2/2 (B)"):
+            assert torch.equal(unet_lora_params_after_B[k_to_check], unet_lora_params_before_B[k_to_check])
+
+    return unet
 
 class DreamBoothDataset(Dataset):
     """
@@ -1319,7 +1403,6 @@ def main(args):
         )
 
     # Move unet, vae and text_encoder to device and cast to weight_dtype
-    unet.to(accelerator.device, dtype=weight_dtype)
 
     # The VAE is always in float32 to avoid NaN losses.
     vae.to(accelerator.device, dtype=torch.float32)
@@ -1350,14 +1433,42 @@ def main(args):
             text_encoder_two.gradient_checkpointing_enable()
 
     # now we will add new LoRA weights to the attention layers
+    if args.experiment_name in ["ortho_init"]:
+        if args.lora_path is None or args.lora_path == "":
+            pass
+        else:
+            unet_lora_config = LoraConfig(
+                r=args.rank,
+            lora_alpha=args.rank,
+            init_lora_weights="gaussian",
+                target_modules=["to_k", "to_q", "to_v", "to_out.0"],
+            )
+            unet.add_adapter(unet_lora_config, adapter_name="continual")
+            unet = init_lora_with_checkpoint(unet=unet, lora_path=args.lora_path, accelerator=accelerator, verify=True, name="continual")
+            unet.fuse_lora()
+            unet.delete_adapters(adapter_names=["continual"])
+            unet.requires_grad_(False)
+    unet.to(accelerator.device, dtype=weight_dtype)
+
     unet_lora_config = LoraConfig(
         r=args.rank,
         lora_alpha=args.rank,
         init_lora_weights="gaussian",
         target_modules=["to_k", "to_q", "to_v", "to_out.0"],
     )
-    unet.add_adapter(unet_lora_config)
+    unet.add_adapter(unet_lora_config, adapter_name="default")
 
+    if args.experiment_name in ["naive_cl"]:
+        if args.lora_path is None or args.lora_path == "":
+            pass
+        else:
+            unet = init_lora_with_checkpoint(unet=unet, lora_path=args.lora_path, accelerator=accelerator)
+
+    if args.experiment_name in ["ortho_init"]:
+        if args.lora_path is None or args.lora_path == "":
+            pass
+        else:
+            unet = init_lora_with_checkpoint_rotate(unet=unet, lora_path=args.lora_path, accelerator=accelerator, verify=True, name="default")
 
     # The text encoder comes from 🤗 transformers, so we cannot directly modify it.
     # So, instead, we monkey-patch the forward calls of its attention-blocks.
@@ -1413,6 +1524,7 @@ def main(args):
                 unet_lora_layers=unet_lora_layers_to_save,
                 text_encoder_lora_layers=text_encoder_one_lora_layers_to_save,
                 text_encoder_2_lora_layers=text_encoder_two_lora_layers_to_save,
+                weight_name="default"
             )
 
     def load_model_hook(models, input_dir):
@@ -1567,43 +1679,8 @@ def main(args):
             weight_decay=args.adam_weight_decay,
             eps=args.adam_epsilon,
         )
-
-    if args.optimizer.lower() == "prodigy":
-        try:
-            import prodigyopt
-        except ImportError:
-            raise ImportError(
-                "To use Prodigy, please install the prodigyopt library: `pip install prodigyopt`"
-            )
-
-        optimizer_class = prodigyopt.Prodigy
-
-        if args.learning_rate <= 0.1:
-            logger.warning(
-                "Learning rate is too low. When using prodigy, it's generally better to set learning rate around 1.0"
-            )
-        if args.train_text_encoder and args.text_encoder_lr:
-            logger.warning(
-                f"Learning rates were provided both for the unet and the text encoder- e.g. text_encoder_lr:"
-                f" {args.text_encoder_lr} and learning_rate: {args.learning_rate}. "
-                f"When using prodigy only learning_rate is used as the initial learning rate."
-            )
-            # changes the learning rate of text_encoder_parameters_one and text_encoder_parameters_two to be
-            # --learning_rate
-            params_to_optimize[1]["lr"] = args.learning_rate
-            params_to_optimize[2]["lr"] = args.learning_rate
-
-        optimizer = optimizer_class(
-            params_to_optimize,
-            lr=args.learning_rate,
-            betas=(args.adam_beta1, args.adam_beta2),
-            beta3=args.prodigy_beta3,
-            weight_decay=args.adam_weight_decay,
-            eps=args.adam_epsilon,
-            decouple=args.prodigy_decouple,
-            use_bias_correction=args.prodigy_use_bias_correction,
-            safeguard_warmup=args.prodigy_safeguard_warmup,
-        )
+    else:
+        raise NotImplementedError("Prodigy not usable")
 
     # Dataset and DataLoaders creation:
     train_dataset = DreamBoothDataset(
@@ -2298,14 +2375,30 @@ def main(args):
                 ignore_patterns=["step_*", "epoch_*"],
             )
 
-        if args.experiment_name in ["merge_and_init", "mag_max_light"]:
+        # cl lora postprocess
+        if args.experiment_name in ["naive_cl"]:
+            # just don't remove LoRA weights
+            pass
+
+        elif args.experiment_name in ["ortho_init"]:
+            if args.lora_path is not None and args.lora_path != "":
+                lora_continual_path = (Path(args.lora_path)/"pytorch_lora_weights.safetensors").resolve()
+                lora_current_path = (Path(args.output_dir)/"pytorch_lora_weights.safetensors").resolve()
+                lora_continual_tasks = load_file(lora_continual_path)
+                lora_current_task = load_file(lora_current_path)
+
+                merged_lora_weights = merge_loras(lora_current_task, lora_continual_tasks)
+                save_file(merged_lora_weights, lora_current_path)
+
+        elif args.experiment_name in ["merge_and_init", "mag_max_light"]:
+            # we merge LoRAs to U-Net
             pipeline.fuse_lora(fuse_unet=True)
             pipeline.unload_lora_weights()
 
             if args.experiment_name == "mag_max_light":
+                # if we do MagMax, we perform MagMax on weights before saving
                 all_tasks_vector = TaskVector(pipeline, base_pipeline)
                 last_task_vector = all_tasks_vector - previous_tasks_vector
-
                 del pipeline, all_tasks_vector, base_pipeline
 
                 merged_vector = merge_max_abs([previous_tasks_vector, last_task_vector])
@@ -2314,9 +2407,11 @@ def main(args):
                 )
                 pipeline = merged_vector.apply_to(pipeline)
 
+            # eventually we store whole pipeline + remove adapters
             pipeline.save_pretrained(args.output_dir)
             lora_path = Path(args.output_dir)
-            os.remove((lora_path / "pytorch_lora_weights.safetensors").resolve())
+            if args.experiment_name != "ortho_init":
+                os.remove((lora_path / "pytorch_lora_weights.safetensors").resolve())
 
     accelerator.end_training()
 

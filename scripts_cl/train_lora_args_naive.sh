@@ -6,10 +6,11 @@ export RANK=64
 export SEED=$(($1))
 export WORK_DIR=$2
 export EXPERIMENT_NAME=$3
-export MODEL_NAME="stabilityai/stable-diffusion-xl-base-1.0"
+export BASE_MODEL_NAME="stabilityai/stable-diffusion-xl-base-1.0"
+export LORA_MODEL_NAME=""
 
 echo "Seed: $SEED, Work dir: $WORK_DIR"
-echo "Model name: $MODEL_NAME"
+echo "Model name: $BASE_MODEL_NAME"
 echo "Experiment name: $EXPERIMENT_NAME"
 
 shift 3
@@ -21,16 +22,17 @@ $arg
 EOF
 
   echo "TASK $index"
-  echo "Train prompt: $train_prompt Validation prompt: $valid_prompt, Dataset dir: $dataset_dir, Model name: $MODEL_NAME"
+  echo "Train prompt: $train_prompt Validation prompt: $valid_prompt, Dataset dir: $dataset_dir, Model name: $LORA_MODEL_NAME"
 
   export OUTPUT_DIR="${WORK_DIR}/${index}"
   export INSTANCE_DIR=$dataset_dir
   export PROMPT=$train_prompt
   export VALID_PROMPT=$valid_prompt
-  export MODEL_NAME=$MODEL_NAME
+  export BASE_MODEL_NAME=$BASE_MODEL_NAME
+  export LORA_MODEL_NAME=$LORA_MODEL_NAME
 
   $ACCELERATE_PATH launch lora/train_dreambooth_lora_sdxl.py \
-    --pretrained_model_name_or_path=$MODEL_NAME  \
+    --pretrained_model_name_or_path=$BASE_MODEL_NAME  \
     --instance_data_dir=$INSTANCE_DIR \
     --pretrained_vae_model_name_or_path=$VAE_PATH \
     --output_dir=$OUTPUT_DIR \
@@ -50,8 +52,9 @@ EOF
     --gradient_checkpointing \
     --use_8bit_adam \
     --experiment_name=$EXPERIMENT_NAME \
+    --lora_path=$LORA_MODEL_NAME
 
-  export MODEL_NAME=$OUTPUT_DIR
+  export LORA_MODEL_NAME=$OUTPUT_DIR
   wait
 done
 

@@ -30,3 +30,11 @@ mv checkpoint.pth res/csd_checkpoint.pth
 
 ## Credits
 The repository contains code from [task_vectors](https://github.com/mlfoundations/task_vectors) and [magmax](https://github.com/danielm1405/magmax).
+
+
+## IMPORTANT
+
+In the file: `python3.11/site-packages/diffusers/pipelines/pipeline_utils.py`, line ~278 (`DiffusionPipeline.save_pretrained()`):
+```
+save_kwargs = {"max_shard_size": "15GB"}
+```

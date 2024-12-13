@@ -166,3 +166,5 @@ wandb/
 ziplora/wandb/
 results/
 res/
+.vscode/
+venv/

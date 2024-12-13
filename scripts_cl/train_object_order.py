@@ -9,6 +9,10 @@ OBJECT_DATASET_CONFIG = "data/data_object/config.json"
 TRAIN_PROMPT_TEMPLATE = "a photo of {}"
 VALID_PROMPT = "a {} in the jungle"
 
+SCRIPT_PATH_LORA="./scripts_cl/train_lora_args_naive.sh"
+SCRIPT_PATH_ORTHO_INIT="./scripts_cl/train_lora_args_ortho_init.sh"
+SCRIPT_PATH_MERGE="./scripts_cl/train_lora_args.sh"
+
 
 DREAMBOOTH_CLASSES = {
     "backpack": ["backpack", "backpack_dog"],
@@ -34,6 +38,15 @@ def get_work_dir(experiment_name: str, object_seed: int, order_seed: int) -> str
 
 
 def main(experiment_name: str, object_seed: int, order_seed: int) -> None:
+    if experiment_name in ["merge_and_init", "mag_max_light"]:
+        script_path = SCRIPT_PATH_MERGE
+    elif experiment_name in ["naive_cl"]:
+        script_path = SCRIPT_PATH_LORA
+    elif experiment_name in ["ortho_init"]:
+        script_path = SCRIPT_PATH_ORTHO_INIT
+    else:
+        raise NotImplementedError(f"Unknown experiment name: {experiment_name}")
+
     path_to_save_models = get_work_dir(experiment_name, object_seed, order_seed)
     os.makedirs(path_to_save_models, exist_ok=True)
 
@@ -62,7 +75,7 @@ def main(experiment_name: str, object_seed: int, order_seed: int) -> None:
     subprocess.call(
         [
             "sh",
-            "./scripts_cl/train_lora_args.sh",
+            script_path,
             str(object_seed),
             path_to_save_models,
             experiment_name,
@@ -84,9 +97,8 @@ if __name__ == "__main__":
         "--experiment_name",
         type=str,
         required=True,
-        default="merge_and_init",
         help="Name of the experiment",
-        choices=["merge_and_init", "mag_max_light"],
+        choices=["merge_and_init", "mag_max_light", "naive_cl", "ortho_init"],
     )
 
     args = parser.parse_args()
