@@ -1,5 +1,20 @@
 # ZipLora Analysis
 
+## Datasets
+1. Download the [Unlearn Dataset](https://drive.google.com/drive/folders/1-1Sc8h_tGArZv5Y201ugTF0K0D_Xn2lM) and place it in the /data/style_unlearn directory.
+
+2. To generate style datasets, run:
+```python
+python preprocess/generate_style_dataset.py
+```
+
+3. To generate object datasets, run:
+Generate dataset for objects:
+```python
+python preprocess/generate_object_dataset.py
+```
+
+
 ## LoRA models
 
 Training LoRA subject model:
