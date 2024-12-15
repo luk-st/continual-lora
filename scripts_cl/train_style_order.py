@@ -62,8 +62,6 @@ def main(experiment_name: str, style_seed: int, order_seed: int) -> None:
     for idx, task in enumerate(train_styles["tasks"]):
         task["index"] = idx + 1
         task["train_prompt"] = TRAIN_PROMPT_TEMPLATE.format(task["style"], task["train_object"])
-        task["index"] = idx
-        task["train_prompt"] = TRAIN_PROMPT_TEMPLATE.format(task["style"], task["train_object"])
         task["valid_prompt"] = VALID_PROMPT.format(task["style"])
         serialized_lists.append(f"{task['index']},{task['train_prompt']},{task['valid_prompt']},{task['train_path']}")
 
