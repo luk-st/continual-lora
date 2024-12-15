@@ -101,7 +101,6 @@ def csd_metric(pred_imgs: List[Image.Image], ref_path: str) -> float:
 
 
 def calculate_cl_metrics(metric_matrix):
-    # TODO: check which axis is which
     T = metric_matrix.shape[0]
 
     final_avg_accuracy = metric_matrix[:, T - 1].mean()

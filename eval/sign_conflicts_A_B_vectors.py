@@ -19,7 +19,7 @@ def load_pipe_from_model_task(model_path, method_name, device):
         pipeline = StableDiffusionXLPipeline.from_pretrained(model_path, torch_dtype=torch.float16)
 
     elif method_name in ["merge_and_init", "ortho_init", "mag_max_light"]:
-        vae = AutoencoderKL.from_pretrained(model_path, subfolder="vae", torch_dtype=torch.float16)
+        vae = AutoencoderKL.from_pretrained(BASE_VAE_PATH, torch_dtype=torch.float16)
         pipeline = StableDiffusionXLPipeline.from_pretrained(model_path, vae=vae, torch_dtype=torch.float16)
 
     elif method_name in ["naive_cl"]:
@@ -51,7 +51,6 @@ def _get_models(method_name, task_type, seed, order):
     models_path = f"./models/{method_name}/seed_{seed}_{task_type}/seed_{order}_order"
     tasks = get_tasks(file_path=(Path(models_path) / Path("config.json")).resolve())
     n_tasks = len(tasks)
-    # TODO: as always problem with style
     return [f"{models_path}/{i}" for i in range(1, n_tasks + 1)]
 
 
@@ -132,7 +131,6 @@ def main(models_path, task_type, method_name):
     os.makedirs(out_path, exist_ok=True)
 
     model_names = get_tasks(file_path=(Path(models_path) / Path("config.json")).resolve())
-    # TODO: as always problem with style
     model_names = [str(i) for i in range(1, len(model_names) + 1)]
     final_df = pd.DataFrame(index=model_names, columns=model_names)
     final_df_norm = pd.DataFrame(index=model_names, columns=model_names)
