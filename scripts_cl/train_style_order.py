@@ -13,6 +13,10 @@ SCRIPT_PATH_LORA="./scripts_cl/train_lora_args_naive.sh"
 SCRIPT_PATH_ORTHO_INIT="./scripts_cl/train_lora_args_ortho_init.sh"
 SCRIPT_PATH_MERGE="./scripts_cl/train_lora_args.sh"
 
+SCRIPT_PATH_LORA="./scripts_cl/train_lora_args_naive.sh"
+SCRIPT_PATH_ORTHO_INIT="./scripts_cl/train_lora_args_ortho_init.sh"
+SCRIPT_PATH_MERGE="./scripts_cl/train_lora_args.sh"
+
 
 def get_work_dir(experiment_name: str, style_seed: int, order_seed: int) -> str:
     return f"./models/{experiment_name}/seed_{style_seed}_style/seed_{order_seed}_order"
@@ -25,6 +29,15 @@ def save_serialized_lists(path: str, serialized_lists: list) -> None:
 
 
 def main(experiment_name: str, style_seed: int, order_seed: int) -> None:
+    if experiment_name in ["merge_and_init", "mag_max_light"]:
+        script_path = SCRIPT_PATH_MERGE
+    elif experiment_name in ["naive_cl"]:
+        script_path = SCRIPT_PATH_LORA
+    elif experiment_name in ["ortho_init"]:
+        script_path = SCRIPT_PATH_ORTHO_INIT
+    else:
+        raise NotImplementedError(f"Unknown experiment name: {experiment_name}")
+
     if experiment_name in ["merge_and_init", "mag_max_light"]:
         script_path = SCRIPT_PATH_MERGE
     elif experiment_name in ["naive_cl"]:
@@ -47,6 +60,8 @@ def main(experiment_name: str, style_seed: int, order_seed: int) -> None:
     serialized_lists = []
 
     for idx, task in enumerate(train_styles["tasks"]):
+        task["index"] = idx + 1
+        task["train_prompt"] = TRAIN_PROMPT_TEMPLATE.format(task["style"], task["train_object"])
         task["index"] = idx
         task["train_prompt"] = TRAIN_PROMPT_TEMPLATE.format(task["style"], task["train_object"])
         task["valid_prompt"] = VALID_PROMPT.format(task["style"])
@@ -59,6 +74,7 @@ def main(experiment_name: str, style_seed: int, order_seed: int) -> None:
         [
             "sh",
             script_path,
+            script_path,
             str(style_seed),
             path_to_save_models,
             experiment_name,
@@ -68,6 +84,8 @@ def main(experiment_name: str, style_seed: int, order_seed: int) -> None:
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Run token training in different order")
+    parser.add_argument("--style_seed", type=int, required=True, help="Seed for training")
     parser = argparse.ArgumentParser(description="Run token training in different order")
     parser.add_argument("--style_seed", type=int, required=True, help="Seed for training")
     parser.add_argument(
@@ -81,6 +99,7 @@ if __name__ == "__main__":
         type=str,
         required=True,
         help="Name of the experiment",
+        choices=["merge_and_init", "mag_max_light", "naive_cl", "ortho_init"],
         choices=["merge_and_init", "mag_max_light", "naive_cl", "ortho_init"],
     )
 

@@ -42,6 +42,7 @@ def get_prompt_templates(task_type):
     else:
         raise ValueError(f"Unknown task type: {task_type}")
 
+
 def get_order_seed(file_path):
     return int(file_path.split("/")[-1].split("seed_")[1].split("_")[0])
 
@@ -50,10 +51,19 @@ def get_seed_seed(file_path):
     return int(file_path.split("/")[-2].split("seed_")[1].split("_")[0])
 
 
-def get_tasks(file_path):
+def get_tasks(file_path, without_order=False):
     with open(file_path) as f:
         file = json.load(f)
-    return file["tasks"]
+    tasks = file["tasks"]
+
+    if without_order:
+        tasks_map = {int(idx) + 1: task for idx, task in enumerate(tasks)}
+        for task_k, task_v in tasks_map.items():
+            task_v["index"] = task_k
+    else:
+        tasks_map = {int(task["index"]): task for task in tasks}
+
+    return tasks_map, len(tasks)
 
 
 def get_device():
@@ -64,14 +74,18 @@ def get_device():
 
 
 def load_pipe_from_model_task(model_path, method_name, device):
-    if method_name in ["merge_and_init", "ortho_init", "mag_max_light"]:
-        vae = AutoencoderKL.from_pretrained(model_path, subfolder="vae", torch_dtype=torch.float16)
+    if method_name in ["merge_and_init", "mag_max_light", "ortho_init"]:
+        vae = AutoencoderKL.from_pretrained(BASE_VAE_PATH, torch_dtype=torch.float16)
         pipeline = StableDiffusionXLPipeline.from_pretrained(model_path, vae=vae, torch_dtype=torch.float16)
 
     elif method_name in ["naive_cl"]:
         vae = AutoencoderKL.from_pretrained(BASE_VAE_PATH, torch_dtype=torch.float16)
         pipeline = StableDiffusionXLPipeline.from_pretrained(BASE_SDXL_PATH, vae=vae, torch_dtype=torch.float16)
         pipeline.load_lora_weights(model_path)
+
+    elif method_name in ["base"]:
+        vae = AutoencoderKL.from_pretrained(BASE_VAE_PATH, torch_dtype=torch.float16)
+        pipeline = StableDiffusionXLPipeline.from_pretrained(BASE_SDXL_PATH, vae=vae, torch_dtype=torch.float16)
 
     pipeline = pipeline.to(device)
     return pipeline
@@ -106,11 +120,13 @@ def sample_ranked_batched(
     device: torch.device,
     num_inference_steps=N_STEPS,
     batch_size=BATCH_SIZE,
+    print_accelerate_status=False,
 ):
     generator = torch.Generator(device=device).manual_seed(GENERATOR_SEED)
     prompt_indices = list(range(len(prompts)))
     with distributed_state.split_between_processes(prompt_indices) as rank_indices:
-        print(f"Split ({distributed_state.process_index}/{distributed_state.num_processes}): {rank_indices}")
+        if print_accelerate_status:
+            print(f"Split ({distributed_state.process_index}/{distributed_state.num_processes}): {rank_indices}")
         rank_prompt = [prompts[idx] for idx in rank_indices]
         rank_noises = noises[rank_indices]
         outputs = []
@@ -142,20 +158,24 @@ def sample_ranked_batched(
     return all_outputs
 
 
-def sample_cl_models(models_path, tasks_configs, method_name, out_path, prompt_templates):
+def sample_cl_models(models_path, tasks_configs, method_name, out_path, prompt_templates, task_type):
     distributed_state, device = get_device()
     if distributed_state.is_main_process:
         print(f"> Starting: sampling")
+    print_accelerate_status = True
 
-    tasks_map = {int(task["index"]): task for task in tasks_configs}
+    if method_name == "base":
+        models_after_tasks = [list(tasks_configs.values())[sorted(list(tasks_configs.keys()))[-1] - 1]]
+    else:
+        models_after_tasks = list(tasks_configs.values())
 
     # loop over each model after task
-    for model_after_task_config in tqdm(tasks_configs, desc="Sampling models"):
+    for model_after_task_config in tqdm(models_after_tasks, desc="Sampling models"):
         model_after_task_idx = model_after_task_config["index"]
         out_path_after_task = out_path / Path(f"after_task_{model_after_task_idx}")
         os.makedirs(out_path_after_task, exist_ok=True)
 
-        model_path = (models_path / Path(f"{model_after_task_idx}")).resolve()
+        model_path = (models_path / Path(f"{model_after_task_idx}")).resolve() if method_name != "base" else ""
         pipe: StableDiffusionXLPipeline = load_pipe_from_model_task(
             model_path,
             method_name,
@@ -164,14 +184,20 @@ def sample_cl_models(models_path, tasks_configs, method_name, out_path, prompt_t
         pipe.set_progress_bar_config(disable=True)
 
         for task_number in tqdm(range(1, model_after_task_idx + 1), "Sampling on tasks"):
-            task_config = tasks_map[task_number]
-            task_prompt = task_config["style"]
+            task_config = tasks_configs[task_number]
+            task_prompt = task_config["prompt"] if task_type == "object" else task_config["style"]
 
             noises = prepare_noise(device, n_prompts=len(prompt_templates))
             prompts = prepare_prompts(prompts_templates=prompt_templates, task_token=task_prompt)
             outputs = sample_ranked_batched(
-                pipeline=pipe, prompts=prompts, noises=noises, distributed_state=distributed_state, device=device
+                pipeline=pipe,
+                prompts=prompts,
+                noises=noises,
+                distributed_state=distributed_state,
+                device=device,
+                print_accelerate_status=print_accelerate_status,
             )
+            print_accelerate_status = False
 
             task_out_path = out_path_after_task
             save_pickle({"prompts": prompts, "samples": outputs}, task_out_path / Path(f"on_task_{task_number}.pkl"))
@@ -183,14 +209,20 @@ def make_all_dirs(out_path, n_tasks):
         os.makedirs(out_path / Path(f"after_task_{task_idx}"), exist_ok=True)
 
 
-def get_object_metrics(models_path, method_name, task_type):
-    order_seed = get_order_seed(models_path)
-    seed_seed = get_seed_seed(models_path)
-    out_path = (Path(RESULTS_DIR) / Path(f"{task_type}/{method_name}/order_{order_seed}/seed_{seed_seed}")).resolve()
+def get_object_metrics(models_path, method_name, task_type, config_path):
+    if method_name == "base":
+        out_path = (Path(RESULTS_DIR) / Path(f"{task_type}/base")).resolve()
+        tasks, n_tasks = get_tasks(file_path=Path(config_path).resolve(), without_order=True)
+    else:
+        order_seed = get_order_seed(models_path)
+        seed_seed = get_seed_seed(models_path)
+        out_path = (
+            Path(RESULTS_DIR) / Path(f"{task_type}/{method_name}/order_{order_seed}/seed_{seed_seed}")
+        ).resolve()
+        tasks, n_tasks = get_tasks(file_path=(Path(models_path) / Path("config.json")).resolve())
+
     prompt_templates = get_prompt_templates(task_type=task_type)
 
-    tasks = get_tasks(file_path = (Path(models_path) / Path("config.json")).resolve())
-    n_tasks = len(tasks)
     make_all_dirs(out_path, n_tasks)
 
     sample_cl_models(
@@ -199,16 +231,32 @@ def get_object_metrics(models_path, method_name, task_type):
         method_name=method_name,
         out_path=out_path,
         prompt_templates=prompt_templates,
+        task_type=task_type,
     )
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--models_path", type=str, required=True)
+    parser.add_argument("--models_path", type=str, required=False, default=None)
     parser.add_argument(
-        "--method_name", type=str, required=True, choices=["mag_max_light", "merge_and_init", "naive_cl", "ortho_init"]
+        "--method_name",
+        type=str,
+        required=True,
+        choices=["mag_max_light", "merge_and_init", "naive_cl", "ortho_init", "base"],
     )
+    parser.add_argument("--config_path", type=str, required=False, default=None)
     parser.add_argument("--task_type", type=str, required=True, choices=["object", "style"])
     args = parser.parse_args()
 
-    get_object_metrics(models_path=args.models_path, method_name=args.method_name, task_type=args.task_type)
+    if args.method_name == "base" and args.config_path is None:
+        raise ValueError("Base method requires config path")
+
+    elif args.method_name != "base" and args.models_path is None:
+        raise ValueError("Models path is required for non-base methods")
+
+    get_object_metrics(
+        models_path=args.models_path,
+        method_name=args.method_name,
+        task_type=args.task_type,
+        config_path=args.config_path,
+    )

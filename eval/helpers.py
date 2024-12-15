@@ -6,7 +6,7 @@ import torch
 from diffusers import DiffusionPipeline
 
 from eval.constants import BASE_SDXL_MODEL, DEVICE
-from eval.metrics import clip_image_metric, dino_metric, csd_metric
+from eval.metrics import clip_image_metric, csd_metric, dino_metric
 
 
 def get_model_outs(
@@ -162,13 +162,3 @@ def convert_metrics_to_arrays(metrics_names, tasks_metrics_dict, n_tasks):
         for metric_name, metric_values in values.items()
     }
     return arrays
-
-
-def average_on_seeds(seeds_metrics, metrics_names):
-    return {
-        metric_name: np.mean(
-            np.stack([seed_metric[metric_name] for seed_metric in seeds_metrics]),
-            axis=0,
-        )
-        for metric_name in metrics_names
-    }

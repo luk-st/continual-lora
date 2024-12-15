@@ -60,6 +60,7 @@ def copy_styles(
         for obj, obj_idx in zip(metric_objects, metric_objects_idx):
             img_path = os.path.join(ORIGINAL_DATASET_PATH, style, obj, f"{obj_idx}.jpg")
             output_img_path = os.path.join(metric_path, f"{obj}_{obj_idx}.jpg")
+            os.makedirs(metric_path, exist_ok=True)
             shutil.copy(img_path, output_img_path)
 
         tasks.append(
