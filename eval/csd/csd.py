@@ -26,20 +26,13 @@ def get_img(image, device=DEVICE):
 
 def csdimage_metric(pred_imgs, ref_imgs, csd_model) -> float:
     pred_imgs = [get_img(img) for img in pred_imgs]
-    style_output_pred_list = []
-    for pred_img in pred_imgs:
-        _, _, style_output_pred = csd_model(pred_img)
-        style_output_pred_list.append(style_output_pred.cpu().detach())
 
-    pred_img_tensors = torch.cat(style_output_pred_list, dim=0).unsqueeze(1)
+    _, _, pred_img_tensors = csd_model(torch.cat(pred_imgs, dim=0))
+    pred_img_tensors = pred_img_tensors.cpu().detach().unsqueeze(1)
 
     ref_imgs = [get_img(img) for img in ref_imgs]
-    style_output_ref_list = []
-    for ref_img in ref_imgs:
-        _, _, style_output_ref = csd_model(ref_img)
-        style_output_ref_list.append(style_output_ref.cpu().detach())
-
-    ref_img_tensors = torch.cat(style_output_ref_list, dim=0).unsqueeze(0)
+    _, _, ref_img_tensors = csd_model(torch.cat(ref_imgs, dim=0))
+    ref_img_tensors = ref_img_tensors.cpu().detach().unsqueeze(0)
 
     cosine_similarities = F.cosine_similarity(
         pred_img_tensors, ref_img_tensors, dim=-1
