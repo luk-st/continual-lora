@@ -1,8 +1,6 @@
 #!/bin/bash
 
-# methods=("mag_max_light" "merge_and_init" "ortho_init" "naive_cl")
-methods=("naive_cl")
-# methods=("naive_cl")
+methods=("mag_max_light" "merge_and_init" "ortho_init" "naive_cl")
 order_seeds=(0 5 10 42)
 style_seeds=(0 5)
 export PYTHONPATH=\$PWD
