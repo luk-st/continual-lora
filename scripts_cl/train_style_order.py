@@ -72,7 +72,6 @@ def main(experiment_name: str, style_seed: int, order_seed: int) -> None:
         [
             "sh",
             script_path,
-            script_path,
             str(style_seed),
             path_to_save_models,
             experiment_name,
@@ -97,7 +96,6 @@ if __name__ == "__main__":
         type=str,
         required=True,
         help="Name of the experiment",
-        choices=["merge_and_init", "mag_max_light", "naive_cl", "ortho_init"],
         choices=["merge_and_init", "mag_max_light", "naive_cl", "ortho_init"],
     )
 
