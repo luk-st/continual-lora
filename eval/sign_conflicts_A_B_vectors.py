@@ -16,20 +16,20 @@ BASE_SDXL_PATH = "stabilityai/stable-diffusion-xl-base-1.0"
 
 def load_pipe_from_model_task(model_path, method_name, device):
     if model_path == "stabilityai/stable-diffusion-xl-base-1.0":
-        pipeline = StableDiffusionXLPipeline.from_pretrained(model_path, torch_dtype=torch.float16)
+        pipeline = StableDiffusionXLPipeline.from_pretrained(model_path, torch_dtype=torch.float32)
 
     elif method_name in ["merge_and_init", "ortho_init", "mag_max_light"]:
-        vae = AutoencoderKL.from_pretrained(BASE_VAE_PATH, torch_dtype=torch.float16)
-        pipeline = StableDiffusionXLPipeline.from_pretrained(model_path, vae=vae, torch_dtype=torch.float16)
+        vae = AutoencoderKL.from_pretrained(BASE_VAE_PATH, torch_dtype=torch.float32)
+        pipeline = StableDiffusionXLPipeline.from_pretrained(model_path, vae=vae, torch_dtype=torch.float32)
 
     elif method_name in ["naive_cl"]:
-        vae = AutoencoderKL.from_pretrained(BASE_VAE_PATH, torch_dtype=torch.float16)
-        pipeline = StableDiffusionXLPipeline.from_pretrained(BASE_SDXL_PATH, vae=vae, torch_dtype=torch.float16)
+        vae = AutoencoderKL.from_pretrained(BASE_VAE_PATH, torch_dtype=torch.float32)
+        pipeline = StableDiffusionXLPipeline.from_pretrained(BASE_SDXL_PATH, vae=vae, torch_dtype=torch.float32)
         pipeline.load_lora_weights(model_path)
         pipeline.fuse_lora(fuse_unet=True)
         pipeline.unload_lora_weights()
 
-    pipeline = pipeline.to(device)
+    # pipeline = pipeline.to(device)
     return pipeline
 
 
@@ -66,19 +66,15 @@ def _get_number_of_sign_conflicts(vector_A, vector_B):
     return torch.sum(vector_A.cpu() * vector_B.cpu() < 0).item()
 
 
-def _get_unet_att_weights(model):
-    att_weights = {
-        k: v.cpu()
-        for k, v in model.state_dict().items()
-        if any(sub in k for sub in ["to_w", "to_k", "to_out", "to_v"])
-    }
+def get_unet_weights(model):
+    att_weights = {k: v.cpu() for k, v in model.state_dict().items() if any(sub in k for sub in ['to_q', 'to_k', 'to_out', 'to_v']) and not k.endswith(".bias")}
     assert len(att_weights) == 140 * 4
     return att_weights
 
 
 def get_vector_differs(pipe, pipe_to_subtract):
-    main_vector = _get_unet_att_weights(pipe.components["unet"])
-    subtract_vector = _get_unet_att_weights(pipe_to_subtract.components["unet"])
+    main_vector = get_unet_weights(pipe.components["unet"])
+    subtract_vector = get_unet_weights(pipe_to_subtract.components["unet"])
     return {k: v - subtract_vector[k] for k, v in main_vector.items()}
 
 
@@ -137,7 +133,7 @@ def main(models_path, task_type, method_name):
 
     print(final_df)
 
-    models = _get_models(method_name=method_name, task_type=task_type, seed_seed=seed_seed, order_seed=order_seed)
+    models = _get_models(method_name=method_name, task_type=task_type, seed=seed_seed, order=order_seed)
     models_to_subtract = _get_subtract_models(models_to_subtract=models)
 
     print(f"Seed: {seed_seed}")

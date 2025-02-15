@@ -22,6 +22,7 @@ GENERATOR_SEED = 42
 BASE_VAE_PATH = "madebyollin/sdxl-vae-fp16-fix"
 BASE_SDXL_PATH = "stabilityai/stable-diffusion-xl-base-1.0"
 
+
 def get_prompt_templates(task_type):
     if task_type == "object":
         return [
@@ -75,17 +76,17 @@ def get_device():
 
 def load_pipe_from_model_task(model_path, method_name, device):
     if method_name in ["merge_and_init", "mag_max_light", "ortho_init"]:
-        vae = AutoencoderKL.from_pretrained(BASE_VAE_PATH, torch_dtype=torch.float16)
-        pipeline = StableDiffusionXLPipeline.from_pretrained(model_path, vae=vae, torch_dtype=torch.float16)
+        vae = AutoencoderKL.from_pretrained(BASE_VAE_PATH, torch_dtype=torch.float32)
+        pipeline = StableDiffusionXLPipeline.from_pretrained(model_path, vae=vae, torch_dtype=torch.float32)
 
     elif method_name in ["naive_cl"]:
-        vae = AutoencoderKL.from_pretrained(BASE_VAE_PATH, torch_dtype=torch.float16)
-        pipeline = StableDiffusionXLPipeline.from_pretrained(BASE_SDXL_PATH, vae=vae, torch_dtype=torch.float16)
+        vae = AutoencoderKL.from_pretrained(BASE_VAE_PATH, torch_dtype=torch.float32)
+        pipeline = StableDiffusionXLPipeline.from_pretrained(BASE_SDXL_PATH, vae=vae, torch_dtype=torch.float32)
         pipeline.load_lora_weights(model_path)
 
     elif method_name in ["base"]:
-        vae = AutoencoderKL.from_pretrained(BASE_VAE_PATH, torch_dtype=torch.float16)
-        pipeline = StableDiffusionXLPipeline.from_pretrained(BASE_SDXL_PATH, vae=vae, torch_dtype=torch.float16)
+        vae = AutoencoderKL.from_pretrained(BASE_VAE_PATH, torch_dtype=torch.float32)
+        pipeline = StableDiffusionXLPipeline.from_pretrained(BASE_SDXL_PATH, vae=vae, torch_dtype=torch.float32)
 
     pipeline = pipeline.to(device)
     return pipeline
@@ -98,7 +99,7 @@ def prepare_noise(device, n_prompts):
             (N_SAMPLES_PER_PROMPT, 4, 128, 128),
             generator=generator,
             device=device,
-            dtype=torch.float16,
+            dtype=torch.float32,
         )
 
     return torch.cat([get_noise_per_prompt(device=device) for _ in range(n_prompts)])

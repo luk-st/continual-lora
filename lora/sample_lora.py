@@ -12,7 +12,7 @@ def main(args):
     # base_model_id = card.data.to_dict()["base_model"]
 
     diffusion_pipe = DiffusionPipeline.from_pretrained(
-        model_path, torch_dtype=torch.float16
+        model_path, torch_dtype=torch.float32
     )
     if args.use_cuda:
         print("Using CUDA...")
@@ -23,7 +23,7 @@ def main(args):
         print("Using refiner...")
         refiner = StableDiffusionXLImg2ImgPipeline.from_pretrained(
             "stabilityai/stable-diffusion-xl-refiner-1.0",
-            torch_dtype=torch.float16,
+            torch_dtype=torch.float32,
             use_safetensors=True,
             variant="fp16",
         )

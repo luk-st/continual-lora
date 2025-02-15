@@ -17,7 +17,7 @@ def get_model_outs(
 ):
     model_path = pretrained_model_name_or_path
     diffusion_pipe = DiffusionPipeline.from_pretrained(
-        model_path, torch_dtype=torch.float16 if device == "cuda" else torch.float32
+        model_path, torch_dtype=torch.float32
     )
     diffusion_pipe = diffusion_pipe.to(device)
     generator = torch.Generator(device)

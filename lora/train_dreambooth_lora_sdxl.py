@@ -764,12 +764,6 @@ def parse_args(input_args=None):
         choices=["merge_and_init", "mag_max_light", "naive_cl", "ortho_init"],
     )
     parser.add_argument(
-        "--save_mag_max",
-        action="store_true",
-        default=False,
-        help=("If True then save the model after selecting the maximum value between the current task vector and the previous tasks vector.")
-    )
-    parser.add_argument(
         "--lora_path",
         type=str,
         default=None,
@@ -2333,7 +2327,11 @@ def main(args):
             torch_dtype=weight_dtype,
         )
         base_pipeline = StableDiffusionXLPipeline.from_pretrained(
-            "stabilityai/stable-diffusion-xl-base-1.0", torch_dtype=torch.float16
+            "stabilityai/stable-diffusion-xl-base-1.0",
+            vae=vae,
+            revision=args.revision,
+            variant=args.variant,
+            torch_dtype=weight_dtype,
         )
         previous_tasks_vector = TaskVector(pipeline, base_pipeline)
 
@@ -2402,8 +2400,13 @@ def main(args):
                 del pipeline, all_tasks_vector, base_pipeline
 
                 merged_vector = merge_max_abs([previous_tasks_vector, last_task_vector])
+
                 pipeline = StableDiffusionXLPipeline.from_pretrained(
-                    "stabilityai/stable-diffusion-xl-base-1.0", torch_dtype=torch.float16
+                    "stabilityai/stable-diffusion-xl-base-1.0",
+                    vae=vae,
+                    revision=args.revision,
+                    variant=args.variant,
+                    torch_dtype=weight_dtype,
                 )
                 pipeline = merged_vector.apply_to(pipeline)
 
