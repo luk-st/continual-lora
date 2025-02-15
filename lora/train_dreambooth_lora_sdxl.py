@@ -2327,7 +2327,11 @@ def main(args):
             torch_dtype=weight_dtype,
         )
         base_pipeline = StableDiffusionXLPipeline.from_pretrained(
-            "stabilityai/stable-diffusion-xl-base-1.0", torch_dtype=weight_dtype
+            "stabilityai/stable-diffusion-xl-base-1.0",
+            vae=vae,
+            revision=args.revision,
+            variant=args.variant,
+            torch_dtype=weight_dtype,
         )
         previous_tasks_vector = TaskVector(pipeline, base_pipeline)
 
@@ -2396,8 +2400,13 @@ def main(args):
                 del pipeline, all_tasks_vector, base_pipeline
 
                 merged_vector = merge_max_abs([previous_tasks_vector, last_task_vector])
+
                 pipeline = StableDiffusionXLPipeline.from_pretrained(
-                    "stabilityai/stable-diffusion-xl-base-1.0", torch_dtype=torch.float32
+                    "stabilityai/stable-diffusion-xl-base-1.0",
+                    vae=vae,
+                    revision=args.revision,
+                    variant=args.variant,
+                    torch_dtype=weight_dtype,
                 )
                 pipeline = merged_vector.apply_to(pipeline)
 

@@ -3,9 +3,7 @@
 export VAE_PATH="madebyollin/sdxl-vae-fp16-fix"
 export ACCELERATE_PATH="accelerate"
 export RANK=64
-echo $RANK
 export SEED=$(($1))
-echo $SEED
 export WORK_DIR=$2
 export EXPERIMENT_NAME=$3
 export MODEL_NAME="stabilityai/stable-diffusion-xl-base-1.0"
@@ -31,9 +29,8 @@ EOF
   export INSTANCE_DIR=$dataset_dir
   export PROMPT=$train_prompt
   export VALID_PROMPT=$valid_prompt
-  export MODEL_NAME=$MODEL_NAME
 
-  $ACCELERATE_PATH launch /net/tscratch/people/plgkzaleska/ziplora-analysis/lora/train_dreambooth_lora_sdxl.py \
+  $ACCELERATE_PATH launch lora/train_dreambooth_lora_sdxl.py \
     --pretrained_model_name_or_path=$MODEL_NAME  \
     --instance_data_dir=$INSTANCE_DIR \
     --pretrained_vae_model_name_or_path=$VAE_PATH \
