@@ -22,6 +22,7 @@ GENERATOR_SEED = 42
 BASE_VAE_PATH = "madebyollin/sdxl-vae-fp16-fix"
 BASE_SDXL_PATH = "stabilityai/stable-diffusion-xl-base-1.0"
 
+
 def get_prompt_templates(task_type):
     if task_type == "object":
         return [

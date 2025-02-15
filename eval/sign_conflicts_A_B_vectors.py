@@ -29,7 +29,7 @@ def load_pipe_from_model_task(model_path, method_name, device):
         pipeline.fuse_lora(fuse_unet=True)
         pipeline.unload_lora_weights()
 
-    pipeline = pipeline.to(device)
+    # pipeline = pipeline.to(device)
     return pipeline
 
 
@@ -73,8 +73,8 @@ def get_unet_weights(model):
 
 
 def get_vector_differs(pipe, pipe_to_subtract):
-    main_vector = _get_unet_att_weights(pipe.components["unet"])
-    subtract_vector = _get_unet_att_weights(pipe_to_subtract.components["unet"])
+    main_vector = get_unet_weights(pipe.components["unet"])
+    subtract_vector = get_unet_weights(pipe_to_subtract.components["unet"])
     return {k: v - subtract_vector[k] for k, v in main_vector.items()}
 
 
@@ -133,7 +133,7 @@ def main(models_path, task_type, method_name):
 
     print(final_df)
 
-    models = _get_models(method_name=method_name, task_type=task_type, seed_seed=seed_seed, order_seed=order_seed)
+    models = _get_models(method_name=method_name, task_type=task_type, seed=seed_seed, order=order_seed)
     models_to_subtract = _get_subtract_models(models_to_subtract=models)
 
     print(f"Seed: {seed_seed}")
