@@ -9,9 +9,9 @@ OBJECT_DATASET_CONFIG = "data/data_object/config.json"
 TRAIN_PROMPT_TEMPLATE = "a photo of {}"
 VALID_PROMPT = "a {} in the jungle"
 
-SCRIPT_PATH_LORA="./scripts_cl/train_lora_args_naive.sh"
-SCRIPT_PATH_ORTHO_INIT="./scripts_cl/train_lora_args_ortho_init.sh"
-SCRIPT_PATH_MERGE="./scripts_cl/train_lora_args.sh"
+SCRIPT_PATH_LORA="./scripts_train/train_lora_args_naive.sh"
+SCRIPT_PATH_ORTHO_INIT="./scripts_train/train_lora_args_ortho_init.sh"
+SCRIPT_PATH_MERGE="./scripts_train/train_lora_args.sh"
 
 
 DREAMBOOTH_CLASSES = {

@@ -7,7 +7,7 @@ from eval.helpers import (average_on_seeds, convert_metrics_to_arrays,
                           get_cl_lora_alignment_metrics, load_pickle,
                           sample_cl_models, save_pickle)
 from eval.metrics import calculate_cl_metrics
-from eval.plots import (plot_incremental_performance_heatmap,
+from plots.incremental_performance_heatmap import (plot_incremental_performance_heatmap,
                         plot_incremental_performance_plot)
 
 SEEDS = [0, 11, 33, 42]

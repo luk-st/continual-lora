@@ -9,14 +9,9 @@ STYLE_DATASET_CONFIG = "data/data_style/config.json"
 TRAIN_PROMPT_TEMPLATE = "{} image of {}"
 VALID_PROMPT = "{} image of pen in the jungle"
 
-SCRIPT_PATH_LORA="./scripts_cl/train_lora_args_naive.sh"
-SCRIPT_PATH_ORTHO_INIT="./scripts_cl/train_lora_args_ortho_init.sh"
-SCRIPT_PATH_MERGE="./scripts_cl/train_lora_args.sh"
-
-SCRIPT_PATH_LORA="./scripts_cl/train_lora_args_naive.sh"
-SCRIPT_PATH_ORTHO_INIT="./scripts_cl/train_lora_args_ortho_init.sh"
-SCRIPT_PATH_MERGE="./scripts_cl/train_lora_args.sh"
-
+SCRIPT_PATH_LORA="./scripts_train/train_lora_args_naive.sh"
+SCRIPT_PATH_ORTHO_INIT="./scripts_train/train_lora_args_ortho_init.sh"
+SCRIPT_PATH_MERGE="./scripts_train/train_lora_args.sh"
 
 def get_work_dir(experiment_name: str, style_seed: int, order_seed: int) -> str:
     return f"./models/{experiment_name}/seed_{style_seed}_style/seed_{order_seed}_order"

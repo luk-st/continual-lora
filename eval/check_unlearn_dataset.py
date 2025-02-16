@@ -4,7 +4,7 @@ from tqdm import tqdm
 
 
 def remove_ds_store(dataset_dir):
-    for root, dirs, files in os.walk(dataset_dir):
+    for root, _, files in os.walk(dataset_dir):
         for file in files:
             if file == ".DS_Store":
                 file_path = os.path.join(root, file)
