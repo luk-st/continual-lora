@@ -1,5 +1,9 @@
 #!/bin/bash
 
+slurm_account="<PASS_SLURM_ACCOUNT>"
+slurm_partition="<PASS_SLURM_PARTITION>"
+conda_env="<PASS_CONDA_ENV>"
+
 methods=("mag_max_light" "merge_and_init" "naive_cl" "ortho_init")
 order_seeds=(0 5 10 42)
 style_seeds=(0 5)
@@ -12,8 +16,8 @@ for method_name in "${methods[@]}"; do
 
             sbatch --output=$log_file --job-name=$job_name <<EOT
 #!/bin/bash
-#SBATCH -A plgdiffusion-gpu-a100
-#SBATCH -p plgrid-gpu-a100
+#SBATCH -A $slurm_account
+#SBATCH -p $slurm_partition
 #SBATCH -t 4:30:00
 #SBATCH --ntasks 1
 #SBATCH --gres gpu:1
@@ -23,7 +27,7 @@ for method_name in "${methods[@]}"; do
 
 module load Miniconda3/23.3.1-0
 eval "\$(conda shell.bash hook)"
-conda activate /net/tscratch/people/plgkzaleska/envs/lora
+conda activate $conda_env
 
 export PYTHONPATH=\$PWD
 

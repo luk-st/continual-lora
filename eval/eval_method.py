@@ -9,7 +9,7 @@ from tqdm import tqdm
 
 from eval.helpers import load_pickle, save_pickle
 from eval.metrics import calculate_cl_metrics, clip_image_metric, csd_metric, dino_metric
-from eval.plots import plot_incremental_performance_heatmap, plot_incremental_performance_plot
+from plots.incremental_performance_heatmap import plot_incremental_performance_heatmap, plot_incremental_performance_plot
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 PATH_METRICS_ROOT = Path("./results/metrics/")

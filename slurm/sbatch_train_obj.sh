@@ -1,6 +1,6 @@
 #!/bin/bash
-#SBATCH -A plgzzsn2024-gpu-a100
-#SBATCH -p plgrid-gpu-a100
+#SBATCH -A $slurm_account
+#SBATCH -p $slurm_partition
 #SBATCH -t 12:00:00
 #SBATCH --ntasks 1
 #SBATCH --gres gpu:1
@@ -15,10 +15,7 @@ module load Miniconda3/23.3.1-0
 
 eval "$(conda shell.bash hook)"
 
-conda activate lora
-
-cd <PASS REPO PATH>
-
+conda activate PASS_CONDA_ENV
 export PYTHONPATH=$PWD
 
-python3 scripts_cl/train_object_order.py --order_seed 42 --object_seed 0 --experiment_name merge_and_init
+python3 scripts_train/train_object_order.py --order_seed 42 --object_seed 0 --experiment_name merge_and_init
