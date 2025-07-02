@@ -16,6 +16,7 @@ We propose to study the effectiveness of LoRA weights initialization and merging
 </div>
 
 ## 🔥 Updates
+- **[2025.04.28]** Our work was presented at the ICLR 2025 Workshop on Scalable Optimization for Efficient and Adaptive Foundation Models ([SCOPE](https://scope-workshop.github.io)).
 - **[2025.02.16]** [Code](https://github.com/luk-st/continual-lora) released.
 - **[2024.10.07]** Paper released on [arXiv](https://arxiv.org/abs/2410.04891).
 
