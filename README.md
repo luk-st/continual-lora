@@ -97,16 +97,15 @@ sh slurm/run_eval.sh
 ## 📚 Citation
 If you find this work useful, please cite:
 ```bibtex
-@misc{staniszewski2024lowrankcontinualpersonalizationdiffusion,
-      title={Low-Rank Continual Personalization of Diffusion Models}, 
-      author={Łukasz Staniszewski and Katarzyna Zaleska and Kamil Deja},
-      year={2024},
-      eprint={2410.04891},
-      archivePrefix={arXiv},
-      primaryClass={cs.LG},
-      url={https://arxiv.org/abs/2410.04891}, 
+@inproceedings{
+      staniszewski2025lowrank,
+      title={Low-Rank Continual Personalization of Diffusion Models},
+      author={{\L}ukasz Staniszewski and Katarzyna Zaleska and Kamil Deja},
+      booktitle={First Workshop on Scalable Optimization for Efficient and Adaptive Foundation Models},
+      year={2025},
+      url={https://openreview.net/forum?id=XsXhhq4Kvx}
 }
 ```
 
 ## 🙏 Credits
-The repository contains code from [task_vectors](https://github.com/mlfoundations/task_vectors) and [magmax](https://github.com/danielm1405/magmax).
+The repository contains code from [task_vectors](https://github.com/mlfoundations/task_vectors), [magmax](https://github.com/danielm1405/magmax) and [diffusers](https://github.com/huggingface/diffusers).
